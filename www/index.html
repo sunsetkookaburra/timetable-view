@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Timetable View</title>
+  <!-- <link rel="stylesheet" href="./main.css"> -->
+  <script src="./lib/ical.min.js"></script>
+  <script src="./lib/timetable-view.js"></script>
+</head>
+<body>
+  <header>
+    <h1>Timetable View</h1>
+    <!-- <h2>Time</h2>
+    <p><time><span>DATE</span> <span>TIME</span></time></p> -->
+  </header>
+  <main>
+    <h2>Events</h2>
+    <ol id="event-list"></ol>
+    <label for="ical-url">iCal URL:</label>
+    <input id="ical-url" type="url">
+    <button id="ical-load">Load Calendar</button>
+  </main>
+  <footer>
+    <h2>Acknowledgements</h2>
+    <p>This tool uses Free and Open Source software,view <a href="https://github.com/sunsetkookaburra/timetable-view#third-party">Third-Party Licenses</a>.</p>
+    <p>(C) 2021 - Oliver Lenehan (1st Year CompSci @ UTS)</p>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,51 @@
+{
+  "uts": {
+    "constant": {
+      "SUBJECT_CODE": "#DESCRIPTION"
+    },
+    "variable": {
+      "nclass": 0
+    },
+    "replace": {
+      "abbr": {
+        "/\\bIntroduction\\b/": "Int.",
+        "/\\bMathematical\\b/": "Math.",
+        "/\\bDatabase\\b/": "DB"
+      },
+      "ordinal_letter": {
+        "/1/": "A",
+        "/2/": "B"
+      },
+      "activity": {
+        "/lec/i": "Lecture",
+        "/tut/i": "Tutorial",
+        "/cmp/i": "Computer Lab"
+      },
+      "room": {
+        "/ONLINE123/": "Online"
+      }
+    },
+    "event": {
+      "shader": {
+        "description": "/([0-9]+)_([A-Z]+)_([A-Z]+)_([0-9])_([A-Z]+), ([A-Za-z]+)([0-9]+), ([0-9]+)\\n(.+)/"
+      },
+      "article": [
+        [
+          ["shader", "description", 0, 1],
+          " ",
+          ["shader", "description", 0, 9]
+        ],
+        [
+          ["replace", ["shader", "description", 0, 6], "activity"],
+          " for ",
+          ["time", "duration"]
+        ],
+        [
+          "@ ",
+          ["time", "start"],
+          ["replace", ["shader", "location", 0, 0], "room"]
+        ]
+      ]
+    }
+  }
+}

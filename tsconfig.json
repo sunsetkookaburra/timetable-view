@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ES6",
+    "allowUnreachableCode": false,
+    "allowUnusedLabels": false,
+    "strict": true,
+    "inlineSourceMap": true,
+    "inlineSources": true,
+    "removeComments": false,
+    "outDir": "./www/lib/"
+  },
+  "files": [
+    "./src/timetable-view.ts"
+  ]
+}
