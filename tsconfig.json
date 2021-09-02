@@ -7,7 +7,7 @@
     "inlineSourceMap": true,
     "inlineSources": true,
     "removeComments": false,
-    "outDir": "./www/lib/"
+    "outDir": "./docs/lib/"
   },
   "files": [
     "./src/timetable-view.ts"
