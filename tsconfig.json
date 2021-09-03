@@ -8,9 +8,9 @@
     "inlineSources": false,
     "sourceMap": true,
     "removeComments": false,
-    "outDir": "./docs/lib/"
+    "outDir": "./lib/"
   },
   "files": [
-    "./docs/src/timetable-view.ts"
+    "./src/timetable-view.ts"
   ]
 }

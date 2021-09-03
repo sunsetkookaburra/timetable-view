@@ -56,6 +56,15 @@ declare namespace ICAL {
 
 }
 
+function encodeHTML(text: string): string {
+  text = text.replace(/&/g, "&amp;");
+  text = text.replace(/</g, "&lt;");
+  text = text.replace(/>/g, "&gt;");
+  text = text.replace(/"/g, "&quot;");
+  text = text.replace(/'/g, "&apos;");
+  return text;
+}
+
 /** Throws `ICAL.parse.ParserError` */
 function parseCalendar(icalData: string) {
 
@@ -160,63 +169,109 @@ function buildEventsView(viewJson: any): EventsView {
 
   type Lexeme = string | number | [name: string, ...args: any/*Lexeme*/[]];
 
+  // has capability for advanced recursion of every attribute,
+  // currently removed for optimisation (and not seen as necessary yet)
+  // also responsible for escaping html chars
   function evalLexeme(state: ArticleState, lexeme: Lexeme): string {
     let out: string;
     if (typeof lexeme == "string") {
-      out = lexeme;
+      out = encodeHTML(lexeme);
     }
     else if (typeof lexeme == "number") {
-      out = lexeme.toString();
+      out = encodeHTML(lexeme.toString());
     }
     else {
       switch (/*fn_name*/lexeme[0]) {
         case "replace": {
           const originalText = evalLexeme(state, lexeme[1]);
-          const replacerKey = evalLexeme(state, lexeme[2]);
-          out = replacers[replacerKey](originalText);
+          const replacerKey = lexeme[2];
+          out = encodeHTML(replacers[replacerKey](originalText));
           break;
         }
         case "shader": {
           const inputText = evalLexeme(state, lexeme[1]);
-          const shaderKey = evalLexeme(state, lexeme[2]);
-          const matchNum = parseInt(evalLexeme(state, lexeme[3])) || 0;
-          const groupNum = parseInt(evalLexeme(state, lexeme[4])) || 0;
+          const shaderKey: string = lexeme[2];
+          const matchNum: number = lexeme[3];
+          const groupNum: number = lexeme[4];
           const compiledShaderKey = inputText+"\x00\x7F\x00"+shaderKey;
           if (compiledShaders.has(compiledShaderKey)) {
-            out = compiledShaders.get(compiledShaderKey)?.[matchNum]?.[groupNum] ?? "";
+            out = encodeHTML(compiledShaders.get(compiledShaderKey)?.[matchNum]?.[groupNum] ?? "");
           }
           else {
             const compilationResult = shaders[shaderKey](inputText);
             compiledShaders.set(compiledShaderKey, compilationResult);
-            out = compiledShaderKey?.[matchNum]?.[groupNum] ?? "";
+            out = encodeHTML(compiledShaderKey?.[matchNum]?.[groupNum] ?? "");
           }
           break;
         }
         case "event": {
-          const eventPropertyKey = evalLexeme(state, lexeme[1]);
+          const eventPropertyKey: string = lexeme[1];
           switch (eventPropertyKey) {
             case "description":
-              out = state.event.description;
+              out = encodeHTML(state.event.description);
               break;
             case "location":
-              out = state.event.location;
+              out = encodeHTML(state.event.location);
               break;
             case "duration":
               let dur = state.event.duration;
-              out = `${dur.weeks}w${dur.days}d${dur.hours}h${dur.minutes}m${dur.seconds}s`;
+              out = encodeHTML(`${dur.weeks}w${dur.days}d${dur.hours}h${dur.minutes}m${dur.seconds}s`);
               break;
             case "start":
               let start = state.event.startDate;
-              out = start.toJSDate().toLocaleString();
+              out = encodeHTML(start.toJSDate().toLocaleString());
               break;
             default:
-              out = "";
+              out = encodeHTML("");
               break;
           }
           break;
         }
+        // UNSAFE
+        case "<span>": {
+          const content = evalLexeme(state, lexeme[1]);
+          const classList: string = lexeme[2];
+          out = `<span class="${encodeHTML(classList)}">${content}</span>`;
+          break;
+        }
+        // UNSAFE
+        case "<strong>": {
+          const content = evalLexeme(state, lexeme[1]);
+          out = `<strong>${content}</strong>`;
+          break;
+        }
+        // UNSAFE
+        case "<em>": {
+          const content = evalLexeme(state, lexeme[1]);
+          out = `<em>${content}</em>`;
+          break;
+        }
+        // UNSAFE
+        case "<i>": {
+          const content = evalLexeme(state, lexeme[1]);
+          out = `<i>${content}</i>`;
+          break;
+        }
+        // UNSAFE
+        case "<b>": {
+          const content = evalLexeme(state, lexeme[1]);
+          out = `<b>${content}</b>`;
+          break;
+        }
+        // UNSAFE
+        case "<time>": {
+          const content = evalLexeme(state, lexeme[1]);
+          out = `<time>${content}</time>`;
+          break;
+        }
+        // UNSAFE
+        case "<abbr>": {
+          const content = evalLexeme(state, lexeme[1]);
+          out = `<time>${content}</time>`;
+          break;
+        }
         default: {
-          out = "";
+          out = encodeHTML("");
           break;
         }
       }
