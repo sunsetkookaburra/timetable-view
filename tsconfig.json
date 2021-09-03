@@ -11,6 +11,6 @@
     "outDir": "./docs/lib/"
   },
   "files": [
-    "./src/timetable-view.ts"
+    "./docs/src/timetable-view.ts"
   ]
 }
