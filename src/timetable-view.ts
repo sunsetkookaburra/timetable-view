@@ -13,6 +13,7 @@ declare namespace ICAL {
   type jCal = [string, ...any[]];
 
   function parse(iCalString: string): jCal;
+
   namespace parse {
     class ParserError extends Error {}
   }
@@ -32,6 +33,12 @@ declare namespace ICAL {
 
   interface Time {
     toJSDate(): Date;
+    compare(aOther: ICAL.Time): -1 | 0 | 1;
+    dayOfYear(): number;
+  }
+
+  namespace Time {
+    function now(): ICAL.Time;
   }
 
   class Event {
@@ -56,70 +63,189 @@ function parseCalendar(icalData: string) {
   const calComp = new ICAL.Component(jcal);
   const events = calComp.getAllSubcomponents("vevent")
     .map(vevent=>new ICAL.Event(vevent));
-
+  
   return events;
 
 }
 
-interface TimetableView {
-  constant: Record<string, string>,
-  variable: Record<string, number>,
-  replace: Record<string, (input: string) => string>,
-  event: {
-    shader: Record<string, (input: string) => [string, ...string[]][]>,
-    article: (string|any[])[][],
-  },
+interface ArticleState {
+  event: ICAL.Event;
 }
 
-function reFromString(source: string): RegExp {
-  const lastSlash = source.lastIndexOf("/");
-  return new RegExp(
-    source.slice(1, lastSlash),
-    source.slice(lastSlash+1)
+interface EventsView {
+  variables: Record<string, number | string>;
+  replacers: Record<string, (input: string) => string>;
+  shaders: Record<string, (input: string) => RegExpExecArray[]>;
+  buildArticle(state: ArticleState): HTMLElement;
+}
+
+function buildRegExp(literal: string): RegExp {
+
+  const lastSlash = literal.lastIndexOf("/");
+
+  const re = new RegExp(
+    literal.slice(1, lastSlash),
+    literal.slice(lastSlash+1)
   );
+
+  return re;
+
 }
 
-function reShader(re: RegExp, input: string): RegExpExecArray[] {
-  const out: RegExpExecArray[] = [];
-  let match: RegExpExecArray | null;
-  re.lastIndex = 0;
-  if (re.global) {
-    while ((match = re.exec(input)) != null) out.push(match);
+function buildReplacer(replacerJson: Record<string, string>): (input: string) => string {
+
+  const regexAndReplaceStringArr: [RegExp, string][] = [];
+
+  for (const regexLiteralKey in replacerJson) {
+    regexAndReplaceStringArr.push([
+      buildRegExp(regexLiteralKey),
+      replacerJson[regexLiteralKey],
+    ]);
   }
-  else {
-    if ((match = re.exec(input)) != null) out.push(match);
-  }
-  return out;
+
+  const fn = (input: string) => {
+    let out = input;
+    for (const [re, str] of regexAndReplaceStringArr) {
+      out = out.replace(re, str);
+    }
+    return out;
+  };
+  
+  return fn;
+
 }
 
-function loadViews(views: any): Record<string, TimetableView> {
-  for (const viewKey in views) {
-    const view = views[viewKey];
-    const replacers = view["replace"];
-    const shaders = view["event"]["shader"];
-    for (const replacerKey in replacers) {
-      const replacer = replacers[replacerKey];
-      const replacerREs = Object.keys(replacer)
-      .map(reKey => {
-        return [
-          reFromString(reKey),
-          replacer[reKey] as string
-        ] as const;
-      });
-      replacers[replacerKey] = (input: string) => {
-        let out = input;
-        for (const [re, str] of replacerREs) {
-          out = out.replace(re, str);
+function buildShader(shaderLiteral: string): (input: string) => RegExpExecArray[] {
+
+  const re = buildRegExp(shaderLiteral);
+
+  const fn = (input: string) => {
+    const out: RegExpExecArray[] = [];
+    let match: RegExpExecArray | null;
+    re.lastIndex = 0;
+    if (re.global) {
+      while ((match = re.exec(input)) != null) out.push(match);
+    }
+    else {
+      if ((match = re.exec(input)) != null) out.push(match);
+    }
+    return out;
+  };
+
+  return fn;
+
+}
+
+function buildEventsView(viewJson: any): EventsView {
+
+  const variables: Record<string, number | string> = viewJson["variables"];
+
+  const replacers = (()=>{
+    let replacersObj: Record<string, ReturnType<typeof buildReplacer>> = {};
+    for (const replacerKey in viewJson["replacers"]) {
+      replacersObj[replacerKey] = buildReplacer(viewJson["replacers"][replacerKey]);
+    }
+    return replacersObj;
+  })();
+
+  const shaders = (()=>{
+    let shadersObj: Record<string, ReturnType<typeof buildShader>> = {};
+    for (const shaderKey in viewJson["shaders"]) {
+      shadersObj[shaderKey] = buildShader(viewJson["shaders"][shaderKey]);
+    }
+    return shadersObj;
+  })();
+
+  const compiledShaders = new Map<string, RegExpMatchArray[]>();
+
+  type Lexeme = string | number | [name: string, ...args: any/*Lexeme*/[]];
+
+  function evalLexeme(state: ArticleState, lexeme: Lexeme): string {
+    let out: string;
+    if (typeof lexeme == "string") {
+      out = lexeme;
+    }
+    else if (typeof lexeme == "number") {
+      out = lexeme.toString();
+    }
+    else {
+      switch (/*fn_name*/lexeme[0]) {
+        case "replace": {
+          const originalText = evalLexeme(state, lexeme[1]);
+          const replacerKey = evalLexeme(state, lexeme[2]);
+          out = replacers[replacerKey](originalText);
+          break;
         }
-        return out;
+        case "shader": {
+          const inputText = evalLexeme(state, lexeme[1]);
+          const shaderKey = evalLexeme(state, lexeme[2]);
+          const matchNum = parseInt(evalLexeme(state, lexeme[3])) || 0;
+          const groupNum = parseInt(evalLexeme(state, lexeme[4])) || 0;
+          const compiledShaderKey = inputText+"\x00\x7F\x00"+shaderKey;
+          if (compiledShaders.has(compiledShaderKey)) {
+            out = compiledShaders.get(compiledShaderKey)?.[matchNum]?.[groupNum] ?? "";
+          }
+          else {
+            const compilationResult = shaders[shaderKey](inputText);
+            compiledShaders.set(compiledShaderKey, compilationResult);
+            out = compiledShaderKey?.[matchNum]?.[groupNum] ?? "";
+          }
+          break;
+        }
+        case "event": {
+          const eventPropertyKey = evalLexeme(state, lexeme[1]);
+          switch (eventPropertyKey) {
+            case "description":
+              out = state.event.description;
+              break;
+            case "location":
+              out = state.event.location;
+              break;
+            case "duration":
+              let dur = state.event.duration;
+              out = `${dur.weeks}w${dur.days}d${dur.hours}h${dur.minutes}m${dur.seconds}s`;
+              break;
+            case "start":
+              let start = state.event.startDate;
+              out = start.toJSDate().toLocaleString();
+              break;
+            default:
+              out = "";
+              break;
+          }
+          break;
+        }
+        default: {
+          out = "";
+          break;
+        }
       }
     }
-    for (const shaderKey in shaders) {
-      const re = reFromString(shaders[shaderKey]);
-      shaders[shaderKey] = reShader.bind(undefined, re);
+
+    // console.log(`Lexeme<${JSON.stringify(lexeme)}> => ${out}`);
+    return out;
+  }
+
+  return {
+    variables, replacers, shaders,
+    buildArticle: (state: ArticleState) => {
+
+      const articleEle = document.createElement("article");
+      for (const line of viewJson["article"]) {
+        const pEle = document.createElement("p");
+
+        // console.log("LINE");
+        for (const phrase of line) {
+          // console.log("PHRASE");
+          pEle.insertAdjacentText("beforeend", evalLexeme(state, phrase));
+        }
+
+        articleEle.append(pEle);
+      }
+      return articleEle;
     }
   }
-  return views;
+
 }
 
 // article maybe https://stackoverflow.com/questions/9852312/list-of-html5-elements-that-can-be-nested-inside-p-element
@@ -131,30 +257,29 @@ async function updateCalendarView(icalhref: string) {
   if (icalRes.ok) {
     const icalData = await icalRes.text();
     try {
+      // this may throw on invalid icalendar data
       const calEvents = parseCalendar(icalData);
-      const views = loadViews({"uts":{"constant":{"SUBJECT_CODE":"#DESCRIPTION"},"variable":{"nclass":0},"replace":{"abbr": {"/\\bIntroduction\\b/": "Int.","/\\bMathematical\\b/": "Math.","/\\bDatabase\\b/": "DB"},"ordinal_letter": {"/1/": "A","/2/": "B"},"activity": {"/lec/i": "Lecture","/tut/i": "Tutorial","/cmp/i": "Computer Lab"},"room": {"/ONLINE123/": "Online"}},"event": {"shader": {"description": "/([0-9]+)_([A-Z]+)_([A-Z]+)_([0-9])_([A-Z]+), ([A-Za-z]+)([0-9]+), ([0-9]+)\\n(.+)/g"},"article": [[["shader", "description", 0, 1]," ",["shader", "description", 0, 9]],[["replace", ["shader", "description", 0, 6], "activity"]," for ",["time", "duration"]],["@ ",["time", "start"],["replace", ["shader", "location", 0, 0], "room"]]]}}});
-      const selectedView = views["uts"];
+      const viewsJson = JSON.parse(await (await fetch("./views.json")).text());
+      (globalThis as any)["TTV_VIEWS"] = viewsJson;
+      (globalThis as any)["TTV_EVENTS"] = calEvents;
+      const view = buildEventsView(viewsJson["uts"]);
       const evList = document.getElementById("event-list") as HTMLOListElement;
       evList.innerHTML = "";
-      for (const ev of calEvents) {
-        if (ev.uid == "uid0") console.log(ev);
-        const evItem = document.createElement("li");
-        const evArticle = document.createElement("article");
-        for (const line of selectedView.event.article) {
-          const para = document.createElement("p");
-          para.textContent = line.toString();
-          evArticle.append(para);
+      const now = ICAL.Time.now();
+      for (const event of calEvents) {
+        if (event.startDate.dayOfYear() <= now.dayOfYear() && now.dayOfYear() <= event.endDate.dayOfYear()) {
+          const evItem = document.createElement("li");
+          evItem.append(view.buildArticle({event}));
+          evList.append(evItem);
         }
-        evItem.append(evArticle);
-        evList.append(evItem);
       }
     }
     catch (e: any) {
-      if (e instanceof ICAL.parse.ParserError) {
-        alert("that url wasn't an ical file!");
+      if (e.name == "ParserError") {
+        alert(e);
       }
       else {
-        alert("FATAL!!! " + (e.message || e.toString()));
+        throw e;
       }
     }
   }

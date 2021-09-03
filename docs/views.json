@@ -1,12 +1,9 @@
 {
   "uts": {
-    "constant": {
-      "SUBJECT_CODE": "#DESCRIPTION"
-    },
-    "variable": {
+    "variables": {
       "nclass": 0
     },
-    "replace": {
+    "replacers": {
       "abbr": {
         "/\\bIntroduction\\b/": "Int.",
         "/\\bMathematical\\b/": "Math.",
@@ -25,27 +22,26 @@
         "/ONLINE123/": "Online"
       }
     },
-    "event": {
-      "shader": {
-        "description": "/([0-9]+)_([A-Z]+)_([A-Z]+)_([0-9])_([A-Z]+), ([A-Za-z]+)([0-9]+), ([0-9]+)\\n(.+)/"
-      },
-      "article": [
-        [
-          ["shader", "description", 0, 1],
-          " ",
-          ["shader", "description", 0, 9]
-        ],
-        [
-          ["replace", ["shader", "description", 0, 6], "activity"],
-          " for ",
-          ["time", "duration"]
-        ],
-        [
-          "@ ",
-          ["time", "start"],
-          ["replace", ["shader", "location", 0, 0], "room"]
-        ]
+    "shaders": {
+      "desc": "/([0-9]+)_([A-Z]+)_([A-Z]+)_([0-9])_([A-Z]+), ([A-Za-z]+)([0-9]+), ([0-9]+)\\n(.+)/"
+    },
+    "article": [
+      [
+        ["shader", ["event", "description"], "desc", 0, 1],
+        " ",
+        ["shader", ["event", "description"], "desc", 0, 9]
+      ],
+      [
+        ["replace", ["shader", ["event", "description"], "desc", 0, 6], "activity"],
+        " for ",
+        ["event", "duration"]
+      ],
+      [
+        "@ ",
+        ["event", "start"],
+        " ",
+        ["replace", ["event", "location"], "room"]
       ]
-    }
+    ]
   }
 }

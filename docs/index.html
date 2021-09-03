@@ -15,10 +15,10 @@
   </header>
   <main>
     <h2>Events</h2>
-    <ol id="event-list"></ol>
+    <ol id="event-list" aria-live="polite"></ol>
     <label for="ical-url">iCal URL:</label>
-    <input id="ical-url" type="url">
-    <button id="ical-load">Load Calendar</button>
+    <input id="ical-url" type="url" required>
+    <button id="ical-load" aria-controls="event-list">Load Calendar</button>
   </main>
   <footer>
     <h2>Acknowledgements</h2>
