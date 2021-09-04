@@ -1,0 +1,74 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Copyright (C) Oliver Lenehan, 2021 */
+
+*,*::before,*::after{box-sizing:inherit;}
+
+/*
+
+Event Variables
+#events > li { --event-progress: absolute float; }
+
+*/
+
+:root {
+  /* to be included with appropriate license */
+  font-family: "Lexend Deca";
+}
+
+body {
+  text-align: center;
+}
+
+footer {
+  text-align: center;
+}
+
+#events {
+  list-style-type: none;
+  list-style-type: "";
+
+  margin: 1em auto;
+  padding: 0;
+  max-width: max-content;
+}
+
+#events > li {
+  list-style-type: none;
+  list-style-type: "";
+
+  margin: 0.5em auto;
+  padding: 0.2em 0.3em;
+  text-align: left;
+  background-color: black;
+  clip-path: polygon(
+    calc(var(--event-progress) * 2.14em) 0%,
+    calc(100% - calc(1 - var(--event-progress)) * 2.14em) 0%,
+    calc(100% - var(--event-progress) * 2.14em) 100%,
+    calc(calc(1 - var(--event-progress)) * 2.14em) 100%
+  );
+}
+
+#events > li > article {
+  padding: 0.5em 2em;
+  background-color: white;
+  clip-path: polygon(
+    calc(var(--event-progress) * 2em) 0%,
+    calc(100% - calc(1 - var(--event-progress)) * 2em) 0%,
+    calc(100% - var(--event-progress) * 2em) 100%,
+    calc(calc(1 - var(--event-progress)) * 2em) 100%
+  );
+}
+
+#events > li > article > p {
+  margin: 0;
+}
+
+#events > li > article > p:nth-child(1) {
+  margin-left: calc(-1em + calc(var(--event-progress) * 2em));
+}
+
+#events > li > article > p:nth-child(3) {
+  margin-left: calc(1em - calc(var(--event-progress) * 2em));
+}

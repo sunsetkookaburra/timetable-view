@@ -8,9 +8,12 @@
     "inlineSources": false,
     "sourceMap": true,
     "removeComments": false,
-    "outDir": "./lib/"
+    "outDir": "./lib/",
+    "module": "None",
+    "outFile": "./lib/timetable-view.js"
   },
   "files": [
-    "./src/timetable-view.ts"
+    "./src/timetable-view.ts",
+    "./src/ical.d.ts"
   ]
 }

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <title>Timetable View</title>
-  <!-- <link rel="stylesheet" href="./main.css"> -->
+  <link id="view-css" rel="stylesheet" href="">
   <script src="./lib/ical.min.js"></script>
   <script src="./lib/timetable-view.js"></script>
 </head>
@@ -15,9 +15,13 @@
   </header>
   <main>
     <h2>Events</h2>
-    <ol id="event-list" aria-live="polite"></ol>
+    <ol id="events" aria-live="polite"></ol>
     <label for="ical-url">iCal URL:</label>
     <input id="ical-url" type="url" required>
+    <br><br>
+    <label for="events-date">For date:</label>
+    <input id="events-date" type="date" required>
+    <br><br>
     <button id="ical-load" aria-controls="event-list">Load Calendar</button>
   </main>
   <footer>

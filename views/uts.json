@@ -1,0 +1,49 @@
+{
+  "variables": {
+    "nclass": 0
+  },
+  "replacers": {
+    "abbr": {
+      "/\\bIntroduction\\b/": "Int.",
+      "/\\bMathematical\\b/": "Math.",
+      "/\\bDatabase\\b/": "DB"
+    },
+    "ordinal_letter": {
+      "/1/": "A",
+      "/2/": "B"
+    },
+    "activity": {
+      "/^lec$/mi": "Lecture",
+      "/^tut$/mi": "Tutorial",
+      "/^cmp$/mi": "Computer Lab",
+      "/^wrk$/mi": "Workshop"
+    },
+    "room": {
+      "/ONLINE\\d*/": "Online"
+    },
+    "duration": {
+      "/.+(\\d+h)(\\d+m).+/": "$1 $2"
+    }
+  },
+  "shaders": {
+    "desc": "/([0-9]+)_([A-Z]+)_([A-Z]+)_([0-9])_([A-Z]+), ([A-Za-z]+)([0-9]+), ([0-9]+)\\n(.+)/"
+  },
+  "article": [
+    [
+      ["<b>", ["shader", ["event", "description"], "desc", 0, 1]],
+      " ",
+      ["replace", ["shader", ["event", "description"], "desc", 0, 9], "abbr"]
+    ],
+    [
+      ["replace", ["shader", ["event", "description"], "desc", 0, 6], "activity"],
+      " for ",
+      ["replace", ["event", "duration"], "duration"]
+    ],
+    [
+      "@ ",
+      ["event", "start"],
+      " ",
+      ["replace", ["event", "location"], "room"]
+    ]
+  ]
+}
