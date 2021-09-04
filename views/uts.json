@@ -1,5 +1,8 @@
 {
   "title": "UTS Timetable View",
+  "filter": [
+    ["start", "<=", "now"]
+  ],
   "variables": {
     "nclass": 0
   },

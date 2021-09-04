@@ -1,8 +1,12 @@
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+  - License, v. 2.0. If a copy of the MPL was not distributed with this
+  - file, You can obtain one at https://mozilla.org/MPL/2.0/. -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <title>Timetable View</title>
+  <link rel="stylesheet" href="./main.css">
   <link id="view-css" rel="stylesheet" href="">
   <script src="./lib/ical.min.js"></script>
   <script src="./lib/timetable-view.js"></script>
@@ -16,18 +20,25 @@
   <main>
     <h2>Events</h2>
     <ol id="events" aria-live="polite"></ol>
-    <label for="ical-url">iCal URL:</label>
-    <input id="ical-url" type="url" required>
-    <br><br>
-    <label for="events-date">For date:</label>
-    <input id="events-date" type="date" required>
-    <br><br>
-    <label for="ttv-view">View ID:</label>
-    <input id="ttv-view" type="text" value="uts" required>
-    <br><br>
-    <button id="ical-load" aria-controls="events">Load Calendar</button>
-    <br><br>
-    <button id="ttv-reset">Reset</button>
+    <h2>Options</h2>
+    <form onsubmit="return false;">
+      <p>
+        <label for="ical-url">iCal URL:</label>
+        <input id="ical-url" type="url" required>
+      </p>
+      <p>
+        <label for="events-date">For date:</label>
+        <input id="events-date" type="date" required>
+      </p>
+      <p>
+        <label for="ttv-view">View ID:</label>
+        <input id="ttv-view" type="text" value="uts" required>
+      </p>
+      <p>
+        <button id="ical-load" aria-controls="events">Load Calendar</button>
+        <button id="ttv-reset">Reset</button>
+      </p>
+    </form>
   </main>
   <footer>
     <h2>Acknowledgements</h2>

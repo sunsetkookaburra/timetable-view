@@ -9,17 +9,6 @@
 /* Setup */
 // <script src="lib/ical.min.js"></script>
 
-window.addEventListener("DOMContentLoaded", () => {
-  TTV.elements.eventsOList.resolve(document.getElementById("events") as any);
-  TTV.elements.icalUrlInput.resolve(document.getElementById("ical-url") as any);
-  TTV.elements.icalLoadButton.resolve(document.getElementById("ical-load") as any);
-  TTV.elements.eventsDateInput.resolve(document.getElementById("events-date") as any);
-  TTV.elements.viewCssLink.resolve(document.getElementById("view-css") as any);
-  TTV.elements.ttvResetButton.resolve(document.getElementById("ttv-reset") as any);
-  TTV.elements.ttvViewInput.resolve(document.getElementById("ttv-view") as any);
-  TTV.elements.viewTitleHeading.resolve(document.getElementById("view-title") as any);
-});
-
 /* localStorage Keys */
 
 const KEY_ICALHREF = "timetable::ical_href";
@@ -392,9 +381,21 @@ namespace TTV {
 
 /* Main */
 
+window.addEventListener("DOMContentLoaded", () => {
+  TTV.elements.eventsOList.resolve(document.getElementById("events") as any);
+  TTV.elements.icalUrlInput.resolve(document.getElementById("ical-url") as any);
+  TTV.elements.icalLoadButton.resolve(document.getElementById("ical-load") as any);
+  TTV.elements.eventsDateInput.resolve(document.getElementById("events-date") as any);
+  TTV.elements.viewCssLink.resolve(document.getElementById("view-css") as any);
+  TTV.elements.ttvResetButton.resolve(document.getElementById("ttv-reset") as any);
+  TTV.elements.ttvViewInput.resolve(document.getElementById("ttv-view") as any);
+  TTV.elements.viewTitleHeading.resolve(document.getElementById("view-title") as any);
+});
+
 TTV.elements.ttvResetButton.then(ele=>{
   ele.addEventListener("click", () => {
     localStorage.removeItem(KEY_ICALHREF);
+    localStorage.removeItem(KEY_VIEWID);
     window.location.reload();
   });
 });
@@ -430,6 +431,7 @@ window.addEventListener("load", async () => {
       && eventsDateInput.reportValidity()
       && ttvViewInput.reportValidity()
     ) {
+      console.log(eventsDateInput.valueAsDate!);
       localStorage.setItem(KEY_ICALHREF, icalHref);
       // localStorage.setItem(KEY_VIEWID, icalHref);
       await TTV.updateCalendarView(

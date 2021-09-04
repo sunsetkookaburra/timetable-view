@@ -1,0 +1,45 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Copyright (C) Oliver Lenehan, 2021 */
+
+@import url('https://fonts.googleapis.com/css2?family=Lexend:wght@100;200;300;400;500;600;700;800;900&display=swap');
+
+*,*::before,*::after{box-sizing:inherit;}
+
+:root {
+  box-sizing: border-box;
+  font-family: "Lexend";
+}
+
+header {
+  text-align: center;
+}
+
+footer {
+  text-align: center;
+}
+
+main {
+  text-align: center;
+}
+
+form {
+  margin: 0 auto;
+  max-width: 12em;
+}
+
+form > p:nth-child(1) {
+  display: block;
+}
+
+form > p > label {
+  display: block;
+  text-align: left;
+}
+
+form > p > input {
+  display: block;
+  width: 100%;
+  font-family: "Lexend";
+}
