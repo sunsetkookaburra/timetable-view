@@ -32,11 +32,14 @@
       </p>
       <p>
         <label for="ttv-view">View ID:</label>
-        <input id="ttv-view" type="text" value="uts" required>
+        <input id="ttv-view" type="text" list="ttv-view-list" value="uts" required>
+        <datalist id="ttv-view-list">
+          <option value="uts"></option>
+        </datalist>
       </p>
       <p>
         <button id="ical-load" aria-controls="events">Load Calendar</button>
-        <button id="ttv-reset">Reset</button>
+        <button id="ttv-reset">Reset Site</button>
       </p>
     </form>
   </main>
