@@ -15,11 +15,15 @@ window.addEventListener("DOMContentLoaded", () => {
   TTV.elements.icalLoadButton.resolve(document.getElementById("ical-load") as any);
   TTV.elements.eventsDateInput.resolve(document.getElementById("events-date") as any);
   TTV.elements.viewCssLink.resolve(document.getElementById("view-css") as any);
+  TTV.elements.ttvResetButton.resolve(document.getElementById("ttv-reset") as any);
+  TTV.elements.ttvViewInput.resolve(document.getElementById("ttv-view") as any);
+  TTV.elements.viewTitleHeading.resolve(document.getElementById("view-title") as any);
 });
 
 /* localStorage Keys */
 
 const KEY_ICALHREF = "timetable::ical_href";
+const KEY_VIEWID = "timetable::view_id";
 
 /* Interfaces */
 
@@ -28,6 +32,7 @@ interface ArticleState {
 }
 
 interface EventsView {
+  title: string,
   variables: Record<string, number | string>;
   replacers: Record<string, (input: string) => string>;
   shaders: Record<string, (input: string) => RegExpExecArray[]>;
@@ -70,6 +75,9 @@ namespace TTV {
     eventsOList: defer<HTMLOListElement>(),
     viewCssLink: defer<HTMLLinkElement>(),
     eventsDateInput: defer<HTMLInputElement>(),
+    ttvResetButton: defer<HTMLButtonElement>(),
+    ttvViewInput: defer<HTMLInputElement>(),
+    viewTitleHeading: defer<HTMLHeadingElement>(),
   };
 
   export const loaded = {
@@ -91,9 +99,11 @@ namespace TTV {
     const [
       eventsOList,
       viewCssLink,
+      viewTitleHeading,
     ] = await Promise.all([
       TTV.elements.eventsOList,
-      TTV.elements.viewCssLink
+      TTV.elements.viewCssLink,
+      TTV.elements.viewTitleHeading,
     ]);
     
     viewCssLink.href = `./views/${viewId}.css`;
@@ -116,6 +126,7 @@ namespace TTV {
         const view = buildEventsView(viewJson);
 
         eventsOList.innerHTML = "";
+        viewTitleHeading.textContent = view.title;
         
         for (const event of calEvents) {
           // temporary const will be global ticker value
@@ -218,6 +229,8 @@ namespace TTV {
   }
 
   function buildEventsView(viewJson: any): EventsView {
+
+    const title = viewJson["title"] || "Timetable View";
 
     const variables: Record<string, number | string> = viewJson["variables"];
   
@@ -354,7 +367,7 @@ namespace TTV {
     }
   
     return {
-      variables, replacers, shaders,
+      title, variables, replacers, shaders,
       buildArticle: (state: ArticleState) => {
   
         const articleEle = document.createElement("article");
@@ -379,16 +392,25 @@ namespace TTV {
 
 /* Main */
 
+TTV.elements.ttvResetButton.then(ele=>{
+  ele.addEventListener("click", () => {
+    localStorage.removeItem(KEY_ICALHREF);
+    window.location.reload();
+  });
+});
+
 window.addEventListener("load", async () => {
 
   const [
     icalLoadButton,
     icalUrlInput,
     eventsDateInput,
+    ttvViewInput,
   ] = await Promise.all([
     TTV.elements.icalLoadButton,
     TTV.elements.icalUrlInput,
     TTV.elements.eventsDateInput,
+    TTV.elements.ttvViewInput,
   ]);
 
   const now = ICAL.Time.now();
@@ -403,11 +425,16 @@ window.addEventListener("load", async () => {
 
   // 1. on load button press
   icalLoadButton.addEventListener("click", async () => {
-    if (icalUrlInput.reportValidity() && eventsDateInput.reportValidity()) {
+    if (
+      icalUrlInput.reportValidity()
+      && eventsDateInput.reportValidity()
+      && ttvViewInput.reportValidity()
+    ) {
       localStorage.setItem(KEY_ICALHREF, icalHref);
+      // localStorage.setItem(KEY_VIEWID, icalHref);
       await TTV.updateCalendarView(
         icalHref,
-        "uts",
+        ttvViewInput.value,
         ICAL.Time.fromJSDate(eventsDateInput.valueAsDate!)
       );
     }
