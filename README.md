@@ -14,7 +14,7 @@ Each member array is a `<p>` line in a timetable *event*. Each component of that
 + `"_event.description"`: text
 + `"_event.location"`: text
 
-### CSS `var(...)` Variables
+### CSS `var(...)` Variables on `#events > li`
 + `--event-progress`: decimal values 0.0 to 1.0.
 
 ## Third-Party
