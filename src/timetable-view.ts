@@ -105,7 +105,7 @@ namespace TTV {
       try {
         // this may throw on invalid icalendar data
         const calEvents = parseCalendar(icalData);
-        const viewJson = JSON.parse(await (await fetch(`./views/${viewId}.json`)).text());
+        const viewJson = JSON.parse(await (await fetch(`./views/${viewId}.json`, {cache: "reload"})).text());
         
         TTV.loaded.events = calEvents;
         TTV.loaded.viewId = viewId;
@@ -278,26 +278,35 @@ namespace TTV {
             }
             break;
           }
-          case "event": {
-            const eventPropertyKey: string = lexeme[1];
-            switch (eventPropertyKey) {
-              case "description":
+          case "var": {
+            const varKey: string = lexeme[1];
+            switch (varKey) {
+              case "_event::description":
                 out = encodeHTML(state.event.description);
                 break;
-              case "location":
+              case "_event::location":
                 out = encodeHTML(state.event.location);
                 break;
-              case "duration":
+              case "_event::duration":
                 let dur = state.event.duration;
                 out = encodeHTML(`${dur.weeks}w${dur.days}d${dur.hours}h${dur.minutes}m${dur.seconds}s`);
                 break;
-              case "start":
-                let start = state.event.startDate;
-                out = encodeHTML(start.toJSDate().toLocaleString());
+              case "_event::start":
+                let start = state.event.startDate.toJSDate();
+                out = encodeHTML(start.toLocaleString("en-AU"));
                 break;
-              default:
-                out = encodeHTML("");
+              case "_event::end":
+                let end = state.event.endDate.toJSDate();
+                out = encodeHTML(end.toLocaleString("en-AU"));
+              default: {
+                if (variables[varKey] != undefined) {
+                  out = encodeHTML(variables[varKey].toString())
+                }
+                else {
+                  out = "";
+                }
                 break;
+              }
             }
             break;
           }
