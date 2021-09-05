@@ -38,20 +38,20 @@
   },
   "article": [
     [
-      ["<b>", ["shader", ["var", "_event::description"], "desc", 0, 1]],
+      ["<b>", ["shader", ["var", "_event.description"], "desc", 0, 1]],
       " ",
-      ["replace", ["shader", ["var", "_event::description"], "desc", 0, 9], "abbr"]
+      ["replace", ["shader", ["var", "_event.description"], "desc", 0, 9], "abbr"]
     ],
     [
-      ["replace", ["shader", ["var", "_event::description"], "desc", 0, 6], "activity"],
+      ["replace", ["shader", ["var", "_event.description"], "desc", 0, 6], "activity"],
       " for ",
-      ["replace", ["var", "_event::duration"], "duration"]
+      ["replace", ["var", "_event.duration"], "duration"]
     ],
     [
       "@ ",
-      ["replace", ["var", "_event::start"], "time"],
+      ["replace", ["var", "_event.start"], "time"],
       " ",
-      ["replace", ["var", "_event::location"], "room"]
+      ["replace", ["var", "_event.location"], "room"]
     ]
   ]
 }
