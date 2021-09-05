@@ -135,6 +135,7 @@ namespace TTV {
 
         eventsOList.innerHTML = "";
         viewTitleHeading.textContent = view.title;
+        calEvents.sort((first, second)=>first.startDate.compare(second.startDate));
         
         for (const event of calEvents) {
           // temporary const will be global ticker value
