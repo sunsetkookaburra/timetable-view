@@ -39,6 +39,25 @@ function encodeHTML(text: string): string {
   return text;
 }
 
+function padStart(data: string, size: number, fill: string): string {
+  return fill
+    .repeat(Math.ceil(size / fill.length))
+    .slice(0, size - data.length)
+    + data;
+}
+
+function localDateStr(date: Date) {
+  return padStart(date.getFullYear().toString(), 4, '0')
+  + "-" + padStart((date.getMonth()+1).toString(), 2, '0')
+  + "-" + padStart(date.getDate().toString(), 2, '0');
+}
+
+function localTimeStr(date: Date) {
+  return padStart(date.getHours().toString(), 4, '0')
+  + ":" + padStart(date.getMinutes().toString(), 2, '0')
+  + ":" + padStart(date.getSeconds().toString(), 2, '0');
+}
+
 interface Defer<T> extends Promise<T> {
   resolve(value: T | PromiseLike<T>): void;
   reject(reason?: any): void;
@@ -424,7 +443,7 @@ window.addEventListener("load", async () => {
   ]);
 
   const now = ICAL.Time.now();
-  eventsDateInput.valueAsDate = now.toJSDate();
+  eventsDateInput.value = localDateStr(now.toJSDate());
 
   let icalHref: string;
 
