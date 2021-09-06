@@ -20,4 +20,7 @@ Each member array is a `<p>` line in a timetable *event*. Each component of that
 ## Third-Party
 + `lib/ical.min.js`
   + Licensed under the [MPL-2.0 License](./LICENSE)
-  + Source code available from https://github.com/mozilla-comm/ical.js
+  + Source code available from [https://github.com/mozilla-comm/ical.js](https://github.com/mozilla-comm/ical.js)
++ Lexend
+  + Homepage: [https://www.lexend.com/](https://www.lexend.com/)
+  + Google Fonts: [https://fonts.google.com/specimen/Lexend](https://fonts.google.com/specimen/Lexend)
