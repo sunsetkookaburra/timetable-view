@@ -180,6 +180,13 @@ namespace TTV {
   // article maybe https://stackoverflow.com/questions/9852312/list-of-html5-elements-that-can-be-nested-inside-p-element
   // useful https://learn-the-web.algonquindesign.ca/topics/html-semantics-cheat-sheet/
 
+  // split up
+  // 
+
+  // export async function createEventsList(): HTMLLIElement[] {
+
+  // }
+
   /** Must only be called after `DOMContentLoaded` event */
   export async function updateCalendarView(opt: { icalHref: string, viewId: string, forDate: Date, refresh: boolean }) {
 
@@ -221,6 +228,7 @@ namespace TTV {
       || TTV.config.get("view_id") == null
       || TTV.config.get("view_data") == null
     ) {
+      // might be better off fetching normally/typically/standard-way like browser does for css
       const viewData = await (await fetch(`./views/${opt.viewId}.json`)).text();
       TTV.config.set("view_id", opt.viewId);
       TTV.config.set("view_data", viewData);
