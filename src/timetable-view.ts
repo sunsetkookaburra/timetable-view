@@ -9,12 +9,6 @@
 /* Setup */
 // <script src="lib/ical.min.js"></script>
 
-/* localStorage Keys */
-
-const KEY_ICALHREF  = "timetable_view::ical_href";
-const KEY_VIEWID    = "timetable_view::view_id";
-const KEY_JCALDATA  = "timetable_view::jcal_data"
-
 /* Interfaces */
 
 interface ArticleState {
@@ -78,17 +72,21 @@ function localTimeStr(date: Date) {
 //   return Object.assign(promise, deferObj);
 // }
 
+/** A wrapper to represent namespaced keys in a `Storage` instance (typically either `localStorage` or `cacheStorage`). */
 class NamespacedStorage<K extends string> {
 
-  // private _keys: Set<string> = new Set<string>();
-
+  /** A wrapper to represent namespaced keys in a `Storage` instance (typically either `localStorage` or `cacheStorage`).  
+   * + `store` is the `Storage` instance to apply namespacing to.  
+   * + `namespace` represents the `prefix::` applied to create the appearance of namespaces. */
   constructor(private store: Storage, private namespace: string) {}
 
+  /** Set a `namespace::key` to `value`. */
   set(key: K, value: string) {
     this.store.setItem(`${this.namespace}::${key}`, value);
   }
 
-  /** Returns true if the value was missing, and thus set. */
+  /** Set a `namespace::key` to `value`, only if it doesn't already exist (think defaults).
+   * Returns true if the value was missing, and thus set. */
   setIfNull(key: K, value: string): boolean {
     if (this.get(key) == null) {
       this.set(key, value);
@@ -98,43 +96,57 @@ class NamespacedStorage<K extends string> {
     }
   }
 
+  /** Get the value of `namespace::key`. */
   get(key: K): string | null {
     return this.store.getItem(`${this.namespace}::${key}`);
   }
 
+  /** Delete the entry for `namespace::key`. */
   delete(key: K): void {
     this.store.removeItem(key);
   }
 
+  /** Flush all `namespace::*` entries. */
   clear(): void {
+    const keys: string[] = [];
     const storeSize = this.store.length;
     for (let i = 0; i < storeSize; ++i) {
-      const key = this.store.key(i)!;
-      if (key.startsWith(`${this.namespace}::`)) {
-        this.store.removeItem(key);
+      const k = this.store.key(i)!;
+      if (k.startsWith(`${this.namespace}::`)) {
+        keys.push(k);
       }
+    }
+    for (const k of keys) {
+      this.store.removeItem(k);
     }
   }
 
 }
 
+/** A global namespace creating an API like interface into the internals of the app. */
 namespace TTV {
 
   export type StorageKeys
   = "ical_href"
-  | "view_id"
   | "jcal_data"
+  | "view_id"
+  | "view_data"
   | "cors_url";
 
+  /** Global configuration for TimetableView */
   export const config = new NamespacedStorage<StorageKeys>(localStorage, "timetable_view");
+  // Set config defaults
   config.setIfNull("cors_url", "https://api.allorigins.win/raw?url=%s");
 
-  export const loaded = {
-    events: [] as ICAL.Event[],
-    icalHref: "",
-    viewId: "",
-    viewJson: {},
-  };
+  /** Stores the parameters used to load the current view. */
+  export const loaded: {
+    now: Date,
+    events: ICAL.Event[],
+    icalHref: string
+    viewId: string,
+    viewJson: Record<string, any>,
+    view: EventsView,
+  } = {} as any;
 
   /** Ready when `DOMContentLoaded` */
   export const elements: {
@@ -163,73 +175,91 @@ namespace TTV {
   // useful https://learn-the-web.algonquindesign.ca/topics/html-semantics-cheat-sheet/
 
   /** Must only be called after `DOMContentLoaded` event */
-  export async function updateCalendarView(opt: {
-    icalHref: string,
-    viewId: string,
-    now: Date,
-  }) {
-    
-    const today = ICAL.Time.fromJSDate(opt.now);
+  export async function updateCalendarView(opt: { icalHref: string, viewId: string, forDate: Date, refresh: boolean }) {
 
-    TTV.elements.viewCssLink.href = `./views/${opt.viewId}.css`;
+    let events: ICAL.Event[];
+    let viewJson: Record<string, any>;
+    let view: EventsView;
 
-    const corsUrl = TTV.config.get("cors_url")!.replace("%s", encodeURIComponent(opt.icalHref));
-    const icalResponse = await fetch(corsUrl);
+    // we've forced a refresh or the icalHref is 'new' (not currently loaded)
+    if (
+      opt.refresh
+      || opt.icalHref != TTV.config.get("ical_href")
+      || TTV.config.get("ical_href") == null
+      || TTV.config.get("jcal_data") == null
+    ) {
+      TTV.config.set("ical_href", opt.icalHref);
 
-    if (icalResponse.ok) {
+      const icalCorsUrl = TTV.config.get("cors_url")!.replace("%s", encodeURIComponent(opt.icalHref));
+      const icalResponse = await fetch(icalCorsUrl);
+
+      // if (icalResponse.ok) ...
+
+      // we assume that ical/json data in this if-block is valid and does not throw
       const icalData = await icalResponse.text();
-      try {
-        // this may throw on invalid icalendar data
-        const calEvents = parseCalendar(icalData);
-        const viewJson = JSON.parse(await (await fetch(`./views/${opt.viewId}.json`, {cache: "reload"})).text());
-        
-        TTV.loaded.events = calEvents;
-        TTV.loaded.viewId = opt.viewId;
-        TTV.loaded.viewJson = viewJson;
-        TTV.loaded.icalHref = opt.icalHref;
 
-        const view = buildEventsView(viewJson);
+      // parse and store jcal parsed version of our calendar
+      // May throw ICAL.parse.ParserError
+      const jcalJson = ICAL.parse(icalData);
+      TTV.config.set("jcal_data", JSON.stringify(jcalJson));
 
-        TTV.elements.eventsOList.innerHTML = "";
-        TTV.elements.viewTitleHeading.textContent = view.title;
-        calEvents.sort((first, second)=>first.startDate.compare(second.startDate));
-        
-        for (const event of calEvents) {
-          // temporary const will be global ticker value
-          const now = ICAL.Time.now().toJSDate().valueOf();
-          if (event.startDate.dayOfYear() <= today.dayOfYear() && today.dayOfYear() <= event.endDate.dayOfYear()) {
-            const evItem = document.createElement("li");
-            // temporary consts will be a global ticker
-            const startPos = event.startDate.toJSDate().valueOf();
-            const endPos = event.endDate.toJSDate().valueOf();
-            const duration = endPos - startPos;
-            const nowPos = now - startPos;
-            const evProgress = Math.min(Math.max(nowPos / duration, 0), 1);
-            evItem.style.setProperty("--event-progress", evProgress.toFixed(2));
-            evItem.append(view.buildArticle({event}));
-            TTV.elements.eventsOList.append(evItem);
-          }
-        }
-      }
-      catch (e: any) {
-        if (e.name == "ParserError") {
-          alert(e);
-        }
-        else {
-          throw e;
-        }
-      }
+      events = parseCalendar(jcalJson);
     }
     else {
-      alert("failed to load ical file :(");
+      events = parseCalendar(JSON.parse(TTV.config.get("jcal_data")!));
     }
+
+    if (
+      opt.refresh
+      || opt.viewId != TTV.config.get("view_id")
+      || TTV.config.get("view_id") == null
+      || TTV.config.get("view_data") == null
+    ) {
+      const viewData = await (await fetch(`./views/${opt.viewId}.json`)).text();
+      TTV.config.set("view_id", opt.viewId);
+      TTV.config.set("view_data", viewData);
+      viewJson = JSON.parse(viewData);
+      view = buildEventsView(viewJson);
+    }
+    else {
+      viewJson = JSON.parse(TTV.config.get("view_data")!);
+      view = buildEventsView(viewJson);
+    }
+
+    events.sort((first, second) => first.startDate.compare(second.startDate));
+
+    TTV.elements.eventsOList.innerHTML = "";
+    TTV.elements.viewTitleHeading.textContent = view.title;
+    TTV.elements.viewCssLink.href = `./views/${opt.viewId}.css`;
+
+    const nowMs = ICAL.Time.now().toJSDate().valueOf();
+    const icalForDate = ICAL.Time.fromJSDate(opt.forDate);
+    for (const event of events) {
+      // temporary const will be global ticker value
+      if (event.startDate.dayOfYear() <= icalForDate.dayOfYear() && icalForDate.dayOfYear() <= event.endDate.dayOfYear()) {
+        const evItem = document.createElement("li");
+        // temporary consts will be a global ticker
+        const startPos = event.startDate.toJSDate().valueOf();
+        const endPos = event.endDate.toJSDate().valueOf();
+        const duration = endPos - startPos;
+        const nowPos = nowMs - startPos;
+        const evProgress = Math.min(Math.max(nowPos / duration, 0), 1);
+        evItem.style.setProperty("--event-progress", evProgress.toFixed(2));
+        evItem.append(view.buildArticle({event}));
+        TTV.elements.eventsOList.append(evItem);
+      }
+    }
+
+    TTV.loaded.events = events;
+    TTV.loaded.icalHref = opt.icalHref;
+    TTV.loaded.viewId = opt.viewId;
+    TTV.loaded.viewJson = viewJson;
+    TTV.loaded.view = view;
   }
 
-  /** Throws `ICAL.parse.ParserError` */
-  function parseCalendar(icalData: string) {
+  function parseCalendar(jcalJson: any) {
   
-    const jcal = ICAL.parse(icalData);
-    const calComp = new ICAL.Component(jcal);
+    const calComp = new ICAL.Component(jcalJson);
     const rawEvents = calComp.getAllSubcomponents("vevent");
     const events = rawEvents.map(vevent=>new ICAL.Event(vevent));
     // JSON.stringify(rawEvents);
@@ -476,6 +506,10 @@ window.addEventListener("DOMContentLoaded", () => {
 
   TTV.elements.eventsDateInput.value = localDateStr(now);
 
+  if (TTV.config.get("ical_href") != null) {
+    TTV.elements.icalLoadButton.textContent = "Reload Calendar";
+  }
+
   // setup event handlers
 
   TTV.elements.ttvResetButton.addEventListener("click", () => {
@@ -489,11 +523,27 @@ window.addEventListener("DOMContentLoaded", () => {
       && TTV.elements.eventsDateInput.reportValidity()
       && TTV.elements.ttvViewInput.reportValidity()
     ) {
-      TTV.config.set("ical_href", TTV.elements.icalUrlInput.value);
+      TTV.elements.icalLoadButton.textContent = "Reload Calendar";
       TTV.updateCalendarView({
+        forDate: TTV.elements.eventsDateInput.valueAsDate!,
         icalHref: TTV.elements.icalUrlInput.value,
         viewId: TTV.elements.ttvViewInput.value,
-        now: TTV.elements.eventsDateInput.valueAsDate!,
+        refresh: true,
+      });
+    }
+  });
+
+  TTV.elements.eventsDateInput.addEventListener("input", () => {
+    if (
+      TTV.elements.icalUrlInput.reportValidity()
+      && TTV.elements.eventsDateInput.reportValidity()
+      && TTV.elements.ttvViewInput.reportValidity()
+    ) {
+      TTV.updateCalendarView({
+        forDate: TTV.elements.eventsDateInput.valueAsDate!,
+        icalHref: TTV.elements.icalUrlInput.value,
+        viewId: TTV.elements.ttvViewInput.value,
+        refresh: false,
       });
     }
   });
@@ -501,13 +551,16 @@ window.addEventListener("DOMContentLoaded", () => {
   // default presentation handling
 
   const icalHref = TTV.config.get("ical_href");
+  const viewId = TTV.config.get("view_id");
 
-  if (icalHref != null) {
+  if (icalHref != null && viewId != null) {
     TTV.elements.icalUrlInput.value = icalHref;
+    TTV.elements.ttvViewInput.value = viewId;
     TTV.updateCalendarView({
+      forDate: now,
       icalHref,
-      viewId: "uts",
-      now: new Date,
+      viewId,
+      refresh: false,
     });
   }
 
