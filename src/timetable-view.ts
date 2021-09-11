@@ -158,6 +158,9 @@ namespace TTV {
     viewCssLink:      HTMLLinkElement,
     ttvResetButton:   HTMLButtonElement,
     ttvViewInput:     HTMLInputElement,
+    ttvPrevButton:    HTMLButtonElement,
+    ttvNextButton:    HTMLButtonElement,
+    ttvEventsHeading: HTMLHeadingElement,
   } = {} as any;
 
   window.addEventListener("DOMContentLoaded", () => {
@@ -169,6 +172,9 @@ namespace TTV {
     TTV.elements.viewCssLink =      document.getElementById("view-css")     as HTMLLinkElement;
     TTV.elements.ttvResetButton =   document.getElementById("ttv-reset")    as HTMLButtonElement;
     TTV.elements.ttvViewInput =     document.getElementById("ttv-view")     as HTMLInputElement;
+    TTV.elements.ttvPrevButton =    document.getElementById("ttv-prev")     as HTMLButtonElement;
+    TTV.elements.ttvNextButton =    document.getElementById("ttv-next")     as HTMLButtonElement;
+    TTV.elements.ttvEventsHeading = document.getElementById("ttv-events-heading") as HTMLHeadingElement;
   });
   
   // article maybe https://stackoverflow.com/questions/9852312/list-of-html5-elements-that-can-be-nested-inside-p-element
@@ -231,6 +237,7 @@ namespace TTV {
     TTV.elements.eventsOList.innerHTML = "";
     TTV.elements.viewTitleHeading.textContent = view.title;
     TTV.elements.viewCssLink.href = `./views/${opt.viewId}.css`;
+    TTV.elements.ttvEventsHeading.textContent = "Events - " + localDateStr(opt.forDate).split("-").reverse().map(Number).join("/");
 
     const nowMs = ICAL.Time.now().toJSDate().valueOf();
     const icalForDate = ICAL.Time.fromJSDate(opt.forDate);
@@ -515,6 +522,38 @@ window.addEventListener("DOMContentLoaded", () => {
   TTV.elements.ttvResetButton.addEventListener("click", () => {
     TTV.config.clear();
     window.location.reload();
+  });
+
+  TTV.elements.ttvPrevButton.addEventListener("click", () => {
+    TTV.elements.eventsDateInput.stepDown();
+    if (
+      TTV.elements.icalUrlInput.reportValidity()
+      && TTV.elements.eventsDateInput.reportValidity()
+      && TTV.elements.ttvViewInput.reportValidity()
+    ) {
+      TTV.updateCalendarView({
+        forDate: TTV.elements.eventsDateInput.valueAsDate!,
+        icalHref: TTV.elements.icalUrlInput.value,
+        viewId: TTV.elements.ttvViewInput.value,
+        refresh: false,
+      });
+    }
+  });
+
+  TTV.elements.ttvNextButton.addEventListener("click", () => {
+    TTV.elements.eventsDateInput.stepUp();
+    if (
+      TTV.elements.icalUrlInput.reportValidity()
+      && TTV.elements.eventsDateInput.reportValidity()
+      && TTV.elements.ttvViewInput.reportValidity()
+    ) {
+      TTV.updateCalendarView({
+        forDate: TTV.elements.eventsDateInput.valueAsDate!,
+        icalHref: TTV.elements.icalUrlInput.value,
+        viewId: TTV.elements.ttvViewInput.value,
+        refresh: false,
+      });
+    }
   });
 
   TTV.elements.icalLoadButton.addEventListener("click", () => {

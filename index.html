@@ -28,7 +28,11 @@
     <p><time><span>DATE</span> <span>TIME</span></time></p> -->
   </header>
   <main>
-    <h2>Events</h2>
+    <h2 id="ttv-events-heading">Events</h2>
+    <p>
+      <button id="ttv-prev" aria-controls="events">Previous Day</button>
+      <button id="ttv-next" aria-controls="events">Next Day</button>
+    </p>
     <ol id="events" aria-live="polite"></ol>
     <h2>Options</h2>
     <form onsubmit="return false;">
