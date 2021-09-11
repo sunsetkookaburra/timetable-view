@@ -11,8 +11,9 @@
 
 /* localStorage Keys */
 
-const KEY_ICALHREF = "timetable::ical_href";
-const KEY_VIEWID = "timetable::view_id";
+const KEY_ICALHREF  = "timetable_view::ical_href";
+const KEY_VIEWID    = "timetable_view::view_id";
+const KEY_JCALDATA  = "timetable_view::jcal_data"
 
 /* Interfaces */
 
@@ -46,47 +47,87 @@ function padStart(data: string, size: number, fill: string): string {
     + data;
 }
 
-function localDateStr(date: Date) {
-  return padStart(date.getFullYear().toString(), 4, '0')
+/** `YEAR-0M-0D` */
+function localDateStr(date: Date): string {
+  return date.getFullYear().toString()
   + "-" + padStart((date.getMonth()+1).toString(), 2, '0')
-  + "-" + padStart(date.getDate().toString(), 2, '0');
+  + "-" + padStart(date.getDate().toString(), 2, '0') as any;
 }
 
+/** `0h:0m:0s` */
 function localTimeStr(date: Date) {
-  return padStart(date.getHours().toString(), 4, '0')
+  return padStart(date.getHours().toString(), 2, '0')
   + ":" + padStart(date.getMinutes().toString(), 2, '0')
   + ":" + padStart(date.getSeconds().toString(), 2, '0');
 }
 
-interface Defer<T> extends Promise<T> {
-  resolve(value: T | PromiseLike<T>): void;
-  reject(reason?: any): void;
-}
+// interface Defer<T> extends Promise<T> {
+//   resolve(value: T | PromiseLike<T>): void;
+//   reject(reason?: any): void;
+// }
 
-function defer<T>(): Defer<T> {
-  const deferObj = {
-    resolve: null as any,
-    reject: null as any,
-  };
-  const promise = new Promise<T>((res, rej)=>{
-    deferObj.resolve = res;
-    deferObj.reject = rej;
-  });
-  return Object.assign(promise, deferObj);
+// function defer<T>(): Defer<T> {
+//   const deferObj = {
+//     resolve: null as any,
+//     reject: null as any,
+//   };
+//   const promise = new Promise<T>((res, rej)=>{
+//     deferObj.resolve = res;
+//     deferObj.reject = rej;
+//   });
+//   return Object.assign(promise, deferObj);
+// }
+
+class NamespacedStorage<K extends string> {
+
+  // private _keys: Set<string> = new Set<string>();
+
+  constructor(private store: Storage, private namespace: string) {}
+
+  set(key: K, value: string) {
+    this.store.setItem(`${this.namespace}::${key}`, value);
+  }
+
+  /** Returns true if the value was missing, and thus set. */
+  setIfNull(key: K, value: string): boolean {
+    if (this.get(key) == null) {
+      this.set(key, value);
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  get(key: K): string | null {
+    return this.store.getItem(`${this.namespace}::${key}`);
+  }
+
+  delete(key: K): void {
+    this.store.removeItem(key);
+  }
+
+  clear(): void {
+    const storeSize = this.store.length;
+    for (let i = 0; i < storeSize; ++i) {
+      const key = this.store.key(i)!;
+      if (key.startsWith(`${this.namespace}::`)) {
+        this.store.removeItem(key);
+      }
+    }
+  }
+
 }
 
 namespace TTV {
 
-  export const elements = {
-    icalUrlInput: defer<HTMLInputElement>(),
-    icalLoadButton: defer<HTMLButtonElement>(),
-    eventsOList: defer<HTMLOListElement>(),
-    viewCssLink: defer<HTMLLinkElement>(),
-    eventsDateInput: defer<HTMLInputElement>(),
-    ttvResetButton: defer<HTMLButtonElement>(),
-    ttvViewInput: defer<HTMLInputElement>(),
-    viewTitleHeading: defer<HTMLHeadingElement>(),
-  };
+  export type StorageKeys
+  = "ical_href"
+  | "view_id"
+  | "jcal_data"
+  | "cors_url";
+
+  export const config = new NamespacedStorage<StorageKeys>(localStorage, "timetable_view");
+  config.setIfNull("cors_url", "https://api.allorigins.win/raw?url=%s");
 
   export const loaded = {
     events: [] as ICAL.Event[],
@@ -95,46 +136,62 @@ namespace TTV {
     viewJson: {},
   };
 
-  export const config = {
-    CORS_URL: "https://api.allorigins.win/raw?url=%s",
-  };
+  /** Ready when `DOMContentLoaded` */
+  export const elements: {
+    eventsOList:      HTMLOListElement,
+    eventsDateInput:  HTMLInputElement,
+    icalUrlInput:     HTMLInputElement,
+    icalLoadButton:   HTMLButtonElement,
+    viewTitleHeading: HTMLHeadingElement,
+    viewCssLink:      HTMLLinkElement,
+    ttvResetButton:   HTMLButtonElement,
+    ttvViewInput:     HTMLInputElement,
+  } = {} as any;
 
+  window.addEventListener("DOMContentLoaded", () => {
+    TTV.elements.eventsOList =      document.getElementById("events")       as HTMLOListElement;
+    TTV.elements.eventsDateInput =  document.getElementById("events-date")  as HTMLInputElement;
+    TTV.elements.icalUrlInput =     document.getElementById("ical-url")     as HTMLInputElement;
+    TTV.elements.icalLoadButton =   document.getElementById("ical-load")    as HTMLButtonElement;
+    TTV.elements.viewTitleHeading = document.getElementById("view-title")   as HTMLHeadingElement;
+    TTV.elements.viewCssLink =      document.getElementById("view-css")     as HTMLLinkElement;
+    TTV.elements.ttvResetButton =   document.getElementById("ttv-reset")    as HTMLButtonElement;
+    TTV.elements.ttvViewInput =     document.getElementById("ttv-view")     as HTMLInputElement;
+  });
+  
   // article maybe https://stackoverflow.com/questions/9852312/list-of-html5-elements-that-can-be-nested-inside-p-element
   // useful https://learn-the-web.algonquindesign.ca/topics/html-semantics-cheat-sheet/
 
-  export async function updateCalendarView(icalHref: string, viewId: string, today = ICAL.Time.now()) {
-
-    const [
-      eventsOList,
-      viewCssLink,
-      viewTitleHeading,
-    ] = await Promise.all([
-      TTV.elements.eventsOList,
-      TTV.elements.viewCssLink,
-      TTV.elements.viewTitleHeading,
-    ]);
+  /** Must only be called after `DOMContentLoaded` event */
+  export async function updateCalendarView(opt: {
+    icalHref: string,
+    viewId: string,
+    now: Date,
+  }) {
     
-    viewCssLink.href = `./views/${viewId}.css`;
+    const today = ICAL.Time.fromJSDate(opt.now);
 
-    const corsHref = TTV.config.CORS_URL.replace("%s", encodeURIComponent(icalHref));
-    const icalRes = await fetch(corsHref);
+    TTV.elements.viewCssLink.href = `./views/${opt.viewId}.css`;
 
-    if (icalRes.ok) {
-      const icalData = await icalRes.text();
+    const corsUrl = TTV.config.get("cors_url")!.replace("%s", encodeURIComponent(opt.icalHref));
+    const icalResponse = await fetch(corsUrl);
+
+    if (icalResponse.ok) {
+      const icalData = await icalResponse.text();
       try {
         // this may throw on invalid icalendar data
         const calEvents = parseCalendar(icalData);
-        const viewJson = JSON.parse(await (await fetch(`./views/${viewId}.json`, {cache: "reload"})).text());
+        const viewJson = JSON.parse(await (await fetch(`./views/${opt.viewId}.json`, {cache: "reload"})).text());
         
         TTV.loaded.events = calEvents;
-        TTV.loaded.viewId = viewId;
+        TTV.loaded.viewId = opt.viewId;
         TTV.loaded.viewJson = viewJson;
-        TTV.loaded.icalHref = icalHref;
+        TTV.loaded.icalHref = opt.icalHref;
 
         const view = buildEventsView(viewJson);
 
-        eventsOList.innerHTML = "";
-        viewTitleHeading.textContent = view.title;
+        TTV.elements.eventsOList.innerHTML = "";
+        TTV.elements.viewTitleHeading.textContent = view.title;
         calEvents.sort((first, second)=>first.startDate.compare(second.startDate));
         
         for (const event of calEvents) {
@@ -150,7 +207,7 @@ namespace TTV {
             const evProgress = Math.min(Math.max(nowPos / duration, 0), 1);
             evItem.style.setProperty("--event-progress", evProgress.toFixed(2));
             evItem.append(view.buildArticle({event}));
-            eventsOList.append(evItem);
+            TTV.elements.eventsOList.append(evItem);
           }
         }
       }
@@ -173,9 +230,9 @@ namespace TTV {
   
     const jcal = ICAL.parse(icalData);
     const calComp = new ICAL.Component(jcal);
-    const events = calComp.getAllSubcomponents("vevent")
-      .map(vevent=>new ICAL.Event(vevent));
-    
+    const rawEvents = calComp.getAllSubcomponents("vevent");
+    const events = rawEvents.map(vevent=>new ICAL.Event(vevent));
+    // JSON.stringify(rawEvents);
     return events;
   
   }
@@ -410,75 +467,48 @@ namespace TTV {
 
 /* Main */
 
-window.addEventListener("DOMContentLoaded", () => {
-  TTV.elements.eventsOList.resolve(document.getElementById("events") as any);
-  TTV.elements.icalUrlInput.resolve(document.getElementById("ical-url") as any);
-  TTV.elements.icalLoadButton.resolve(document.getElementById("ical-load") as any);
-  TTV.elements.eventsDateInput.resolve(document.getElementById("events-date") as any);
-  TTV.elements.viewCssLink.resolve(document.getElementById("view-css") as any);
-  TTV.elements.ttvResetButton.resolve(document.getElementById("ttv-reset") as any);
-  TTV.elements.ttvViewInput.resolve(document.getElementById("ttv-view") as any);
-  TTV.elements.viewTitleHeading.resolve(document.getElementById("view-title") as any);
-});
 
-TTV.elements.ttvResetButton.then(ele=>{
-  ele.addEventListener("click", () => {
-    localStorage.removeItem(KEY_ICALHREF);
-    localStorage.removeItem(KEY_VIEWID);
+window.addEventListener("DOMContentLoaded", () => {
+
+  const now = new Date();
+
+  // setup initial values for input elements
+
+  TTV.elements.eventsDateInput.value = localDateStr(now);
+
+  // setup event handlers
+
+  TTV.elements.ttvResetButton.addEventListener("click", () => {
+    TTV.config.clear();
     window.location.reload();
   });
-});
 
-window.addEventListener("load", async () => {
-
-  const [
-    icalLoadButton,
-    icalUrlInput,
-    eventsDateInput,
-    ttvViewInput,
-  ] = await Promise.all([
-    TTV.elements.icalLoadButton,
-    TTV.elements.icalUrlInput,
-    TTV.elements.eventsDateInput,
-    TTV.elements.ttvViewInput,
-  ]);
-
-  const now = ICAL.Time.now();
-  eventsDateInput.value = localDateStr(now.toJSDate());
-
-  let icalHref: string;
-
-  // update icalHref on input into box
-  icalUrlInput.addEventListener("input", () => {
-    icalHref = icalUrlInput.value;
-  });
-
-  // 1. on load button press
-  icalLoadButton.addEventListener("click", async () => {
+  TTV.elements.icalLoadButton.addEventListener("click", () => {
     if (
-      icalUrlInput.reportValidity()
-      && eventsDateInput.reportValidity()
-      && ttvViewInput.reportValidity()
+      TTV.elements.icalUrlInput.reportValidity()
+      && TTV.elements.eventsDateInput.reportValidity()
+      && TTV.elements.ttvViewInput.reportValidity()
     ) {
-      console.log(eventsDateInput.valueAsDate!);
-      localStorage.setItem(KEY_ICALHREF, icalHref);
-      // localStorage.setItem(KEY_VIEWID, icalHref);
-      await TTV.updateCalendarView(
-        icalHref,
-        ttvViewInput.value,
-        ICAL.Time.fromJSDate(eventsDateInput.valueAsDate!)
-      );
+      TTV.config.set("ical_href", TTV.elements.icalUrlInput.value);
+      TTV.updateCalendarView({
+        icalHref: TTV.elements.icalUrlInput.value,
+        viewId: TTV.elements.ttvViewInput.value,
+        now: TTV.elements.eventsDateInput.valueAsDate!,
+      });
     }
   });
 
-  // 2. fetch from localstorage on init
-  if (localStorage.getItem(KEY_ICALHREF) != null) {
-    icalHref = localStorage.getItem(KEY_ICALHREF)!;
-    icalUrlInput.value = icalHref;
-    if (icalUrlInput.reportValidity()) {
-      localStorage.setItem(KEY_ICALHREF, icalHref);
-      await TTV.updateCalendarView(icalHref, "uts", now);
-    }
+  // default presentation handling
+
+  const icalHref = TTV.config.get("ical_href");
+
+  if (icalHref != null) {
+    TTV.elements.icalUrlInput.value = icalHref;
+    TTV.updateCalendarView({
+      icalHref,
+      viewId: "uts",
+      now: new Date,
+    });
   }
 
 });
