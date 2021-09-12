@@ -290,7 +290,8 @@ namespace TTV {
     TTV.elements.eventsOList.innerHTML = "";
     TTV.elements.viewTitleHeading.textContent = view.title;
     TTV.elements.viewCssLink.href = `./views/${opt.viewId}.css`;
-    TTV.elements.ttvEventsHeading.textContent = "Events - " + localDateStr(opt.forDate).split("-").reverse().map(Number).join("/");
+    const dateStr = localDateStr(opt.forDate);
+    TTV.elements.ttvEventsHeading.innerHTML = "Events - <time datetime='" + dateStr + "'>" + dateStr.split("-").reverse().map(Number).join("/") + "</time>";
 
     const nowMs = ICAL.Time.now().toJSDate().valueOf();
     const icalForDate = ICAL.Time.fromJSDate(opt.forDate);
