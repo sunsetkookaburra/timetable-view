@@ -7,31 +7,31 @@
     "nclass": 0
   },
   "replacers": {
-    "abbr": {
-      "/\\bIntroduction\\b/": "Int.",
-      "/\\bMathematical\\b/": "Math.",
-      "/\\bDatabase\\b/": "DB"
-    },
-    "ordinal_letter": {
-      "/1/": "A",
-      "/2/": "B"
-    },
-    "activity": {
-      "/^lec$/mi": "Lecture",
-      "/^tut$/mi": "Tutorial",
-      "/^cmp$/mi": "Computer Lab",
-      "/^wrk$/mi": "Workshop"
-    },
-    "room": {
-      "/ONLINE\\d*/": "Online",
-      "/^(?! *online)/i": "in "
-    },
-    "duration": {
-      "/.+(\\d+h)(\\d+m).+/": "$1 $2"
-    },
-    "time": {
-      "/\\d+/\\d+/\\d+, (\\d+):(\\d+):\\d+ ([ap]m)/": "$1.$2 $3"
-    }
+    "abbr": [
+      ["/\\bIntroduction\\b/", "Int."],
+      ["/\\bMathematical\\b/", "Math."],
+      ["/\\bDatabase\\b/", "DB"]
+    ],
+    "ordinal_letter": [
+      ["/1/", "A"],
+      ["/2/", "B"]
+    ],
+    "activity": [
+      ["/^lec$/mi", "Lecture"],
+      ["/^tut$/mi", "Tutorial"],
+      ["/^cmp$/mi", "Computer Lab"],
+      ["/^wrk$/mi", "Workshop"]
+    ],
+    "room": [
+      ["/ONLINE\\d*/", "Online"],
+      ["/^(?! *online)/i", "in "]
+    ],
+    "duration": [
+      ["/.+(\\d+h)(\\d+m).+/", "$1 $2"]
+    ],
+    "time": [
+      ["/\\d+/\\d+/\\d+, (\\d+):(\\d+):\\d+ ([ap]m)/", "$1.$2 $3"]
+    ]
   },
   "shaders": {
     "desc": "/([0-9]+)_([A-Z]+)_([A-Z]+)_([0-9])_([A-Z]+), ([A-Za-z]+)([0-9]+), ([0-9]+)\\n(.+)/"

@@ -10,7 +10,8 @@
     "removeComments": false,
     "outDir": "./lib/",
     "module": "None",
-    "outFile": "./lib/timetable-view.js"
+    "outFile": "./lib/timetable-view.js",
+    "noFallthroughCasesInSwitch": true
   },
   "files": [
     "./src/timetable-view.ts",

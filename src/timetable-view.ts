@@ -9,7 +9,48 @@
 /* Setup */
 // <script src="lib/ical.min.js"></script>
 
-/* Interfaces */
+// https://codemix.com/opaque-types-in-javascript/
+type Opaque<K, T> = T & { __TYPE__: K };
+
+/** A string like `"/abc/gi"` */
+type RegexLiteralString = Opaque<"RegexLiteralString", string>;
+
+/** A string like `"start-$1-end"` */
+type RegexReplaceString = Opaque<"RegexReplaceString", string>;
+
+/** Text that has been safely HTML encoded. */
+type HTMLEncodedString = Opaque<"HTMLEncodedString", string>;
+
+namespace ViewScript {
+
+  export type Value = string | number;
+
+  // className=... represents html class="...", like Element.className
+  export type Fn =
+  | [id: "replace",   input:   Token, key: Value                                   ]
+  | [id: "shader",    input:   Token, key: Value, matchNum: Value, groupNum: Value ]
+  | [id: "var",       key:     Value                                               ]
+  | [id: "<strong>",  content: Token, className?: string                           ]
+  | [id: "<em>",      content: Token, className?: string                           ]
+  | [id: "<b>",       content: Token, className?: string                           ]
+  | [id: "<i>",       content: Token, className?: string                           ]
+  | [id: "<span>",    content: Token, className?: string                           ]
+  | [id: "<time>",    content: Token, className?: string                           ]
+  | [id: "<abbr>",    content: Token, className?: string                           ];
+
+  export type Token = Value | Fn;
+
+  export type Line = Token[];
+
+}
+
+interface ViewJSON {
+  title: string;
+  variables: Record<string, string | number>;
+  replacers: Record<string, [RegexLiteralString, RegexReplaceString][]>;
+  shaders: Record<string, RegexLiteralString>;
+  article: ViewScript.Line[];
+}
 
 interface ArticleState {
   event: ICAL.Event;
@@ -23,15 +64,19 @@ interface EventsView {
   buildArticle(state: ArticleState): HTMLElement;
 }
 
+
+// type Lexeme = string | number | [name: string, ...args: any/*Lexeme*/[]];
+
+
 /*  */
 
-function encodeHTML(text: string): string {
+function encodeHTML(text: string): HTMLEncodedString {
   text = text.replace(/&/g, "&amp;");
   text = text.replace(/</g, "&lt;");
   text = text.replace(/>/g, "&gt;");
   text = text.replace(/"/g, "&quot;");
   text = text.replace(/'/g, "&apos;");
-  return text;
+  return text as HTMLEncodedString;
 }
 
 function padStart(data: string, size: number, fill: string): string {
@@ -126,15 +171,15 @@ class NamespacedStorage<K extends string> {
 /** A global namespace creating an API like interface into the internals of the app. */
 namespace TTV {
 
-  export type StorageKeys
-  = "ical_href"
+  export type ConfigKeys =
+  | "ical_href"
   | "jcal_data"
   | "view_id"
   | "view_data"
   | "cors_url";
 
   /** Global configuration for TimetableView */
-  export const config = new NamespacedStorage<StorageKeys>(localStorage, "timetable_view");
+  export const config = new NamespacedStorage<ConfigKeys>(localStorage, "timetable_view");
   // Set config defaults
   config.setIfNull("cors_url", "https://api.allorigins.win/raw?url=%s");
 
@@ -191,7 +236,7 @@ namespace TTV {
   export async function updateCalendarView(opt: { icalHref: string, viewId: string, forDate: Date, refresh: boolean }) {
 
     let events: ICAL.Event[];
-    let viewJson: Record<string, any>;
+    let viewJson: ViewJSON;
     let view: EventsView;
 
     // we've forced a refresh or the icalHref is 'new' (not currently loaded)
@@ -216,10 +261,10 @@ namespace TTV {
       const jcalJson = ICAL.parse(icalData);
       TTV.config.set("jcal_data", JSON.stringify(jcalJson));
 
-      events = parseCalendar(jcalJson);
+      events = parseJcal(jcalJson);
     }
     else {
-      events = parseCalendar(JSON.parse(TTV.config.get("jcal_data")!));
+      events = parseJcal(JSON.parse(TTV.config.get("jcal_data")!));
     }
 
     if (
@@ -272,7 +317,7 @@ namespace TTV {
     TTV.loaded.view = view;
   }
 
-  function parseCalendar(jcalJson: any) {
+  function parseJcal(jcalJson: ICAL.jCal) {
   
     const calComp = new ICAL.Component(jcalJson);
     const rawEvents = calComp.getAllSubcomponents("vevent");
@@ -295,20 +340,24 @@ namespace TTV {
   
   }
 
-  function buildReplacer(replacerJson: Record<string, string>): (input: string) => string {
+  /** Given an array of `[RegExp, RegExp_replacerString]` pairs,
+   * returns a function that transforms a string input by applying the 'rules' in the array in order. */
+  function buildReplacer(replacerRules: [RegExp, string][]): (input: string) => string {
 
-    const regexAndReplaceStringArr: [RegExp, string][] = [];
+    // const regexAndReplaceStringArr: [RegExp, string][] = [];
   
-    for (const regexLiteralKey in replacerJson) {
-      regexAndReplaceStringArr.push([
-        buildRegExp(regexLiteralKey),
-        replacerJson[regexLiteralKey],
-      ]);
-    }
+    // for (const [regexStringLiteral, replacerString] of replacerRules) {
+    //   regexAndReplaceStringArr.push([
+    //     buildRegExp(regexStringLiteral),
+    //     replacerString,
+    //   ]);
+    // }
   
     const fn = (input: string) => {
       let out = input;
-      for (const [re, str] of regexAndReplaceStringArr) {
+      // may need to duplicate replacerRules to prevent mutation
+      // ^^ this is not needed at the moment as inputs to buildReplacer map(), which duplicates
+      for (const [re, str] of replacerRules) {
         out = out.replace(re, str);
       }
       return out;
@@ -318,9 +367,8 @@ namespace TTV {
   
   }
 
-  function buildShader(shaderLiteral: string): (input: string) => RegExpExecArray[] {
-
-    const re = buildRegExp(shaderLiteral);
+  /** Build */
+  function buildShader(re: RegExp): (input: string) => RegExpExecArray[] {
   
     const fn = (input: string) => {
       const out: RegExpExecArray[] = [];
@@ -339,7 +387,7 @@ namespace TTV {
   
   }
 
-  function buildEventsView(viewJson: any): EventsView {
+  function buildEventsView(viewJson: ViewJSON): EventsView {
 
     const title = viewJson["title"] || "Timetable View";
 
@@ -348,7 +396,11 @@ namespace TTV {
     const replacers = (()=>{
       let replacersObj: Record<string, ReturnType<typeof buildReplacer>> = {};
       for (const replacerKey in viewJson["replacers"]) {
-        replacersObj[replacerKey] = buildReplacer(viewJson["replacers"][replacerKey]);
+        replacersObj[replacerKey] = buildReplacer(
+          viewJson["replacers"][replacerKey]
+          .map(([regexStringLiteral, replaceString])=>[
+            buildRegExp(regexStringLiteral), replaceString])
+        );
       }
       return replacersObj;
     })();
@@ -356,39 +408,38 @@ namespace TTV {
     const shaders = (()=>{
       let shadersObj: Record<string, ReturnType<typeof buildShader>> = {};
       for (const shaderKey in viewJson["shaders"]) {
-        shadersObj[shaderKey] = buildShader(viewJson["shaders"][shaderKey]);
+        const re = buildRegExp(viewJson["shaders"][shaderKey] as string);
+        shadersObj[shaderKey] = buildShader(re);
       }
       return shadersObj;
     })();
   
     const compiledShaders = new Map<string, RegExpMatchArray[]>();
   
-    type Lexeme = string | number | [name: string, ...args: any/*Lexeme*/[]];
-  
     // has capability for advanced recursion of every attribute,
     // currently removed for optimisation (and not seen as necessary yet)
     // also responsible for escaping html chars
-    function evalLexeme(state: ArticleState, lexeme: Lexeme): string {
-      let out: string;
-      if (typeof lexeme == "string") {
-        out = encodeHTML(lexeme);
+    function evalToken(state: ArticleState, token: ViewScript.Token): HTMLEncodedString {
+      let out: HTMLEncodedString;
+      if (typeof token == "string") {
+        out = encodeHTML(token);
       }
-      else if (typeof lexeme == "number") {
-        out = encodeHTML(lexeme.toString());
+      else if (typeof token == "number") {
+        out = encodeHTML(token.toString());
       }
       else {
-        switch (/*fn_name*/lexeme[0]) {
+        switch (/*fn_name*/token[0]) {
           case "replace": {
-            const originalText = evalLexeme(state, lexeme[1]);
-            const replacerKey = lexeme[2];
+            const originalText = evalToken(state, token[1]);
+            const replacerKey = token[2];
             out = encodeHTML(replacers[replacerKey](originalText));
             break;
           }
           case "shader": {
-            const inputText = evalLexeme(state, lexeme[1]);
-            const shaderKey: string = lexeme[2];
-            const matchNum: number = lexeme[3];
-            const groupNum: number = lexeme[4];
+            const inputText = evalToken(state, token[1]);
+            const shaderKey: string = token[2].toString();
+            const matchNum: number = parseInt(token[3].toString());
+            const groupNum: number = parseInt(token[4].toString());
             const compiledShaderKey = inputText+"\x00\x7F\x00"+shaderKey;
             if (compiledShaders.has(compiledShaderKey)) {
               out = encodeHTML(compiledShaders.get(compiledShaderKey)?.[matchNum]?.[groupNum] ?? "");
@@ -401,7 +452,7 @@ namespace TTV {
             break;
           }
           case "var": {
-            const varKey: string = lexeme[1];
+            const varKey: string = token[1].toString();
             switch (varKey) {
               case "_event.description":
                 out = encodeHTML(state.event.description);
@@ -420,12 +471,13 @@ namespace TTV {
               case "_event.end":
                 let end = state.event.endDate.toJSDate();
                 out = encodeHTML(end.toLocaleString("en-AU"));
+                break;
               default: {
                 if (variables[varKey] != undefined) {
                   out = encodeHTML(variables[varKey].toString())
                 }
                 else {
-                  out = "";
+                  out = "" as HTMLEncodedString;
                 }
                 break;
               }
@@ -434,45 +486,45 @@ namespace TTV {
           }
           // UNSAFE
           case "<span>": {
-            const content = evalLexeme(state, lexeme[1]);
-            const classList: string = lexeme[2];
-            out = `<span class="${encodeHTML(classList)}">${content}</span>`;
+            const content: HTMLEncodedString = evalToken(state, token[1]);
+            const classList: HTMLEncodedString = encodeHTML(token[2] ?? "");
+            out = `<span class="${classList}">${content}</span>` as HTMLEncodedString;
             break;
           }
           // UNSAFE
           case "<strong>": {
-            const content = evalLexeme(state, lexeme[1]);
-            out = `<strong>${content}</strong>`;
+            const content: HTMLEncodedString = evalToken(state, token[1]);
+            out = `<strong>${content}</strong>` as HTMLEncodedString;
             break;
           }
           // UNSAFE
           case "<em>": {
-            const content = evalLexeme(state, lexeme[1]);
-            out = `<em>${content}</em>`;
+            const content: HTMLEncodedString = evalToken(state, token[1]);
+            out = `<em>${content}</em>` as HTMLEncodedString;
             break;
           }
           // UNSAFE
           case "<i>": {
-            const content = evalLexeme(state, lexeme[1]);
-            out = `<i>${content}</i>`;
+            const content: HTMLEncodedString = evalToken(state, token[1]);
+            out = `<i>${content}</i>`as HTMLEncodedString;
             break;
           }
           // UNSAFE
           case "<b>": {
-            const content = evalLexeme(state, lexeme[1]);
-            out = `<b>${content}</b>`;
+            const content: HTMLEncodedString = evalToken(state, token[1]);
+            out = `<b>${content}</b>` as HTMLEncodedString;
             break;
           }
           // UNSAFE
           case "<time>": {
-            const content = evalLexeme(state, lexeme[1]);
-            out = `<time>${content}</time>`;
+            const content: HTMLEncodedString = evalToken(state, token[1]);
+            out = `<time>${content}</time>` as HTMLEncodedString;
             break;
           }
           // UNSAFE
           case "<abbr>": {
-            const content = evalLexeme(state, lexeme[1]);
-            out = `<time>${content}</time>`;
+            const content: HTMLEncodedString = evalToken(state, token[1]);
+            out = `<time>${content}</time>` as HTMLEncodedString;
             break;
           }
           default: {
@@ -497,7 +549,7 @@ namespace TTV {
           // console.log("LINE");
           for (const phrase of line) {
             // console.log("PHRASE");
-            pEle.insertAdjacentHTML("beforeend", evalLexeme(state, phrase));
+            pEle.insertAdjacentHTML("beforeend", evalToken(state, phrase));
           }
   
           articleEle.append(pEle);
@@ -527,6 +579,26 @@ window.addEventListener("DOMContentLoaded", () => {
 
   // setup event handlers
 
+  /** Returns true if updated; */
+  function checkValidInputsAndUpdate(refresh = false): boolean {
+    if (
+      TTV.elements.icalUrlInput.reportValidity()
+      && TTV.elements.eventsDateInput.reportValidity()
+      && TTV.elements.ttvViewInput.reportValidity()
+    ) {
+      TTV.updateCalendarView({
+        forDate: TTV.elements.eventsDateInput.valueAsDate!,
+        icalHref: TTV.elements.icalUrlInput.value,
+        viewId: TTV.elements.ttvViewInput.value,
+        refresh,
+      });
+      return true;
+    }
+    else {
+      return false;
+    }
+  }
+
   TTV.elements.ttvResetButton.addEventListener("click", () => {
     TTV.config.clear();
     window.location.reload();
@@ -534,65 +606,23 @@ window.addEventListener("DOMContentLoaded", () => {
 
   TTV.elements.ttvPrevButton.addEventListener("click", () => {
     TTV.elements.eventsDateInput.stepDown();
-    if (
-      TTV.elements.icalUrlInput.reportValidity()
-      && TTV.elements.eventsDateInput.reportValidity()
-      && TTV.elements.ttvViewInput.reportValidity()
-    ) {
-      TTV.updateCalendarView({
-        forDate: TTV.elements.eventsDateInput.valueAsDate!,
-        icalHref: TTV.elements.icalUrlInput.value,
-        viewId: TTV.elements.ttvViewInput.value,
-        refresh: false,
-      });
-    }
+    checkValidInputsAndUpdate();
   });
 
   TTV.elements.ttvNextButton.addEventListener("click", () => {
     TTV.elements.eventsDateInput.stepUp();
-    if (
-      TTV.elements.icalUrlInput.reportValidity()
-      && TTV.elements.eventsDateInput.reportValidity()
-      && TTV.elements.ttvViewInput.reportValidity()
-    ) {
-      TTV.updateCalendarView({
-        forDate: TTV.elements.eventsDateInput.valueAsDate!,
-        icalHref: TTV.elements.icalUrlInput.value,
-        viewId: TTV.elements.ttvViewInput.value,
-        refresh: false,
-      });
-    }
+    checkValidInputsAndUpdate();
   });
 
   TTV.elements.icalLoadButton.addEventListener("click", () => {
-    if (
-      TTV.elements.icalUrlInput.reportValidity()
-      && TTV.elements.eventsDateInput.reportValidity()
-      && TTV.elements.ttvViewInput.reportValidity()
-    ) {
+    var refresh;
+    if (checkValidInputsAndUpdate(refresh=true)) {
       TTV.elements.icalLoadButton.textContent = "Reload Calendar";
-      TTV.updateCalendarView({
-        forDate: TTV.elements.eventsDateInput.valueAsDate!,
-        icalHref: TTV.elements.icalUrlInput.value,
-        viewId: TTV.elements.ttvViewInput.value,
-        refresh: true,
-      });
     }
   });
 
   TTV.elements.eventsDateInput.addEventListener("input", () => {
-    if (
-      TTV.elements.icalUrlInput.reportValidity()
-      && TTV.elements.eventsDateInput.reportValidity()
-      && TTV.elements.ttvViewInput.reportValidity()
-    ) {
-      TTV.updateCalendarView({
-        forDate: TTV.elements.eventsDateInput.valueAsDate!,
-        icalHref: TTV.elements.icalUrlInput.value,
-        viewId: TTV.elements.ttvViewInput.value,
-        refresh: false,
-      });
-    }
+    checkValidInputsAndUpdate();
   });
 
   // default presentation handling
@@ -603,12 +633,14 @@ window.addEventListener("DOMContentLoaded", () => {
   if (icalHref != null && viewId != null) {
     TTV.elements.icalUrlInput.value = icalHref;
     TTV.elements.ttvViewInput.value = viewId;
-    TTV.updateCalendarView({
-      forDate: now,
-      icalHref,
-      viewId,
-      refresh: false,
-    });
+    checkValidInputsAndUpdate();
   }
 
 });
+
+window.addEventListener("error", errEv => {
+  const reloadConfirmed = confirm("An error occured: " + errEv.error + ".\nWould you like to reset the site?");
+  if (reloadConfirmed) {
+    TTV.elements.ttvResetButton.click();
+  }
+})
