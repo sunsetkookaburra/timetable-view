@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES6",
+    "outDir": "./lib/",
     "allowUnreachableCode": false,
     "allowUnusedLabels": false,
     "strict": true,
@@ -8,13 +9,15 @@
     "inlineSources": false,
     "sourceMap": true,
     "removeComments": false,
-    "outDir": "./lib/",
     "module": "None",
-    "outFile": "./lib/timetable-view.js",
+    "outFile": "./lib/timetable-view.bundle.js",
     "noFallthroughCasesInSwitch": true
   },
   "files": [
+    "./src/ical.d.ts",
+    "./src/util.ts",
+    "./src/namespaced-storage.ts",
+    "./src/viewscript.ts",
     "./src/timetable-view.ts",
-    "./src/ical.d.ts"
-  ]
+  ],
 }

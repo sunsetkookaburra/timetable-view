@@ -6,50 +6,15 @@
 // Future Optimsation by loading content parallel
 // then wait for DOM at end
 
-/* Setup */
+// Dependencies
 // <script src="lib/ical.min.js"></script>
-
-// https://codemix.com/opaque-types-in-javascript/
-type Opaque<K, T> = T & { __TYPE__: K };
-
-/** A string like `"/abc/gi"` */
-type RegexLiteralString = Opaque<"RegexLiteralString", string>;
-
-/** A string like `"start-$1-end"` */
-type RegexReplaceString = Opaque<"RegexReplaceString", string>;
-
-/** Text that has been safely HTML encoded. */
-type HTMLEncodedString = Opaque<"HTMLEncodedString", string>;
-
-namespace ViewScript {
-
-  export type Value = string | number;
-
-  // className=... represents html class="...", like Element.className
-  export type Fn =
-  | [id: "replace",   input:   Token, key: Value                                   ]
-  | [id: "shader",    input:   Token, key: Value, matchNum: Value, groupNum: Value ]
-  | [id: "var",       key:     Value                                               ]
-  | [id: "<strong>",  content: Token, className?: string                           ]
-  | [id: "<em>",      content: Token, className?: string                           ]
-  | [id: "<b>",       content: Token, className?: string                           ]
-  | [id: "<i>",       content: Token, className?: string                           ]
-  | [id: "<span>",    content: Token, className?: string                           ]
-  | [id: "<time>",    content: Token, className?: string                           ]
-  | [id: "<abbr>",    content: Token, className?: string                           ];
-
-  export type Token = Value | Fn;
-
-  export type Line = Token[];
-
-}
 
 interface ViewJSON {
   title: string;
-  variables: Record<string, string | number>;
+  variables: Record<string, string>;
   replacers: Record<string, [RegexLiteralString, RegexReplaceString][]>;
   shaders: Record<string, RegexLiteralString>;
-  article: ViewScript.Line[];
+  article: ViewScript.SourceCodeProgram[];
 }
 
 interface ArticleState {
@@ -62,110 +27,6 @@ interface EventsView {
   replacers: Record<string, (input: string) => string>;
   shaders: Record<string, (input: string) => RegExpExecArray[]>;
   buildArticle(state: ArticleState): HTMLElement;
-}
-
-
-// type Lexeme = string | number | [name: string, ...args: any/*Lexeme*/[]];
-
-
-/*  */
-
-function encodeHTML(text: string): HTMLEncodedString {
-  text = text.replace(/&/g, "&amp;");
-  text = text.replace(/</g, "&lt;");
-  text = text.replace(/>/g, "&gt;");
-  text = text.replace(/"/g, "&quot;");
-  text = text.replace(/'/g, "&apos;");
-  return text as HTMLEncodedString;
-}
-
-function padStart(data: string, size: number, fill: string): string {
-  return fill
-    .repeat(Math.ceil(size / fill.length))
-    .slice(0, size - data.length)
-    + data;
-}
-
-/** `YEAR-0M-0D` */
-function localDateStr(date: Date): string {
-  return date.getFullYear().toString()
-  + "-" + padStart((date.getMonth()+1).toString(), 2, '0')
-  + "-" + padStart(date.getDate().toString(), 2, '0') as any;
-}
-
-/** `0h:0m:0s` */
-function localTimeStr(date: Date) {
-  return padStart(date.getHours().toString(), 2, '0')
-  + ":" + padStart(date.getMinutes().toString(), 2, '0')
-  + ":" + padStart(date.getSeconds().toString(), 2, '0');
-}
-
-// interface Defer<T> extends Promise<T> {
-//   resolve(value: T | PromiseLike<T>): void;
-//   reject(reason?: any): void;
-// }
-
-// function defer<T>(): Defer<T> {
-//   const deferObj = {
-//     resolve: null as any,
-//     reject: null as any,
-//   };
-//   const promise = new Promise<T>((res, rej)=>{
-//     deferObj.resolve = res;
-//     deferObj.reject = rej;
-//   });
-//   return Object.assign(promise, deferObj);
-// }
-
-/** A wrapper to represent namespaced keys in a `Storage` instance (typically either `localStorage` or `cacheStorage`). */
-class NamespacedStorage<K extends string> {
-
-  /** A wrapper to represent namespaced keys in a `Storage` instance (typically either `localStorage` or `cacheStorage`).  
-   * + `store` is the `Storage` instance to apply namespacing to.  
-   * + `namespace` represents the `prefix::` applied to create the appearance of namespaces. */
-  constructor(private store: Storage, private namespace: string) {}
-
-  /** Set a `namespace::key` to `value`. */
-  set(key: K, value: string) {
-    this.store.setItem(`${this.namespace}::${key}`, value);
-  }
-
-  /** Set a `namespace::key` to `value`, only if it doesn't already exist (think defaults).
-   * Returns true if the value was missing, and thus set. */
-  setIfNull(key: K, value: string): boolean {
-    if (this.get(key) == null) {
-      this.set(key, value);
-      return true;
-    } else {
-      return false;
-    }
-  }
-
-  /** Get the value of `namespace::key`. */
-  get(key: K): string | null {
-    return this.store.getItem(`${this.namespace}::${key}`);
-  }
-
-  /** Delete the entry for `namespace::key`. */
-  delete(key: K): void {
-    this.store.removeItem(key);
-  }
-
-  /** Flush all `namespace::*` entries. */
-  clear(): void {
-    const keys: string[] = [];
-    const storeSize = this.store.length;
-    for (let i = 0; i < storeSize; ++i) {
-      const k = this.store.key(i)!;
-      if (k.startsWith(`${this.namespace}::`)) {
-        keys.push(k);
-      }
-    }
-    for (const k of keys) {
-      this.store.removeItem(k);
-    }
-  }
-
 }
 
 /** A global namespace creating an API like interface into the internals of the app. */
@@ -249,7 +110,7 @@ namespace TTV {
       TTV.config.set("ical_href", opt.icalHref);
 
       const icalCorsUrl = TTV.config.get("cors_url")!.replace("%s", encodeURIComponent(opt.icalHref));
-      const icalResponse = await fetch(icalCorsUrl);
+      const icalResponse = await fetch(icalCorsUrl, { cache: "reload" });
 
       // if (icalResponse.ok) ...
 
@@ -274,7 +135,7 @@ namespace TTV {
       || TTV.config.get("view_data") == null
     ) {
       // might be better off fetching normally/typically/standard-way like browser does for css
-      const viewData = await (await fetch(`./views/${opt.viewId}.json`)).text();
+      const viewData = await (await fetch(`./views/${opt.viewId}.json`, { cache: "reload" })).text();
       TTV.config.set("view_id", opt.viewId);
       TTV.config.set("view_data", viewData);
       viewJson = JSON.parse(viewData);
@@ -328,232 +189,164 @@ namespace TTV {
   
   }
 
-  function buildRegExp(literal: string): RegExp {
-  
-    const lastSlash = literal.lastIndexOf("/");
-  
-    const re = new RegExp(
-      literal.slice(1, lastSlash),
-      literal.slice(lastSlash+1)
-    );
-  
-    return re;
-  
-  }
-
-  /** Given an array of `[RegExp, RegExp_replacerString]` pairs,
-   * returns a function that transforms a string input by applying the 'rules' in the array in order. */
-  function buildReplacer(replacerRules: [RegExp, string][]): (input: string) => string {
-
-    // const regexAndReplaceStringArr: [RegExp, string][] = [];
-  
-    // for (const [regexStringLiteral, replacerString] of replacerRules) {
-    //   regexAndReplaceStringArr.push([
-    //     buildRegExp(regexStringLiteral),
-    //     replacerString,
-    //   ]);
-    // }
-  
-    const fn = (input: string) => {
-      let out = input;
-      // may need to duplicate replacerRules to prevent mutation
-      // ^^ this is not needed at the moment as inputs to buildReplacer map(), which duplicates
-      for (const [re, str] of replacerRules) {
-        out = out.replace(re, str);
-      }
-      return out;
-    };
-    
-    return fn;
-  
-  }
-
-  /** Build */
-  function buildShader(re: RegExp): (input: string) => RegExpExecArray[] {
-  
-    const fn = (input: string) => {
-      const out: RegExpExecArray[] = [];
-      let match: RegExpExecArray | null;
-      re.lastIndex = 0;
-      if (re.global) {
-        while ((match = re.exec(input)) != null) out.push(match);
-      }
-      else {
-        if ((match = re.exec(input)) != null) out.push(match);
-      }
-      return out;
-    };
-  
-    return fn;
-  
-  }
-
   function buildEventsView(viewJson: ViewJSON): EventsView {
 
     const title = viewJson["title"] || "Timetable View";
 
-    const variables: Record<string, number | string> = viewJson["variables"];
-  
+    const variables: Record<string, string> = viewJson["variables"];
+
     const replacers = (()=>{
-      let replacersObj: Record<string, ReturnType<typeof buildReplacer>> = {};
+      let replacersObj: Record<string, RegExpReplacer> = {};
       for (const replacerKey in viewJson["replacers"]) {
-        replacersObj[replacerKey] = buildReplacer(
+        replacersObj[replacerKey] = createRegExpReplacer(
           viewJson["replacers"][replacerKey]
           .map(([regexStringLiteral, replaceString])=>[
-            buildRegExp(regexStringLiteral), replaceString])
+            createRegExpFromString(regexStringLiteral),
+            replaceString
+          ])
         );
       }
       return replacersObj;
     })();
-  
+
     const shaders = (()=>{
-      let shadersObj: Record<string, ReturnType<typeof buildShader>> = {};
+      let shadersObj: Record<string, RegExpShader> = {};
       for (const shaderKey in viewJson["shaders"]) {
-        const re = buildRegExp(viewJson["shaders"][shaderKey] as string);
-        shadersObj[shaderKey] = buildShader(re);
+        const re = createRegExpFromString(viewJson["shaders"][shaderKey]);
+        shadersObj[shaderKey] = createRegExpShader(re);
       }
       return shadersObj;
     })();
-  
-    const compiledShaders = new Map<string, RegExpMatchArray[]>();
-  
-    // has capability for advanced recursion of every attribute,
-    // currently removed for optimisation (and not seen as necessary yet)
-    // also responsible for escaping html chars
-    function evalToken(state: ArticleState, token: ViewScript.Token): HTMLEncodedString {
-      let out: HTMLEncodedString;
-      if (typeof token == "string") {
-        out = encodeHTML(token);
-      }
-      else if (typeof token == "number") {
-        out = encodeHTML(token.toString());
-      }
-      else {
-        switch (/*fn_name*/token[0]) {
-          case "replace": {
-            const originalText = evalToken(state, token[1]);
-            const replacerKey = token[2];
-            out = encodeHTML(replacers[replacerKey](originalText));
-            break;
-          }
-          case "shader": {
-            const inputText = evalToken(state, token[1]);
-            const shaderKey: string = token[2].toString();
-            const matchNum: number = parseInt(token[3].toString());
-            const groupNum: number = parseInt(token[4].toString());
-            const compiledShaderKey = inputText+"\x00\x7F\x00"+shaderKey;
-            if (compiledShaders.has(compiledShaderKey)) {
-              out = encodeHTML(compiledShaders.get(compiledShaderKey)?.[matchNum]?.[groupNum] ?? "");
+
+    // not really necessary at this level, remove for now
+    // const shaderCache = new Map<string, RegExpMatchArray[]>();
+
+    const viewsArrayScriptRuntime = new ViewScript.Runtime<ArticleState>({
+      "shader"(state, args): Text {
+        const inputText = args[0].textContent ?? "";
+        const shaderKey = args[1].textContent ?? "";
+        const matchNum = parseInt(args[2].textContent ?? "") || 0;
+        const groupNum = parseInt(args[3].textContent ?? "") || 0;
+        let element: Text;
+        if (shaderKey in shaders) {
+          const shaderResult = shaders[shaderKey](inputText);
+          element = new Text(shaderResult[matchNum][groupNum]);
+        }
+        else {
+          element = new Text();
+        }
+        return element;
+      },
+      "replace"(state, args): Text {
+        const originalText = args[0].textContent ?? "";
+        const replacerKey = args[1].textContent ?? "";
+        let element: Text;
+        if (replacerKey in replacers) {
+          const replacerResult = replacers[replacerKey](originalText);
+          element = new Text(replacerResult);
+        }
+        else {
+          element = new Text();
+        }
+        return element;
+      },
+      "var"(state, args): Text {
+        const varKey = args[0].textContent ?? "";
+        let variableValue: string;
+        if (varKey in variables) {
+          variableValue = variables[varKey];
+        }
+        else {
+          switch (varKey) {
+            case "_event.description": {
+              variableValue = state.event.description;
+              break;
             }
-            else {
-              const compilationResult = shaders[shaderKey](inputText);
-              compiledShaders.set(compiledShaderKey, compilationResult);
-              out = encodeHTML(compilationResult?.[matchNum]?.[groupNum] ?? "");
+            case "_event.location": {
+              variableValue = state.event.location
+              break;
             }
-            break;
-          }
-          case "var": {
-            const varKey: string = token[1].toString();
-            switch (varKey) {
-              case "_event.description":
-                out = encodeHTML(state.event.description);
-                break;
-              case "_event.location":
-                out = encodeHTML(state.event.location);
-                break;
-              case "_event.duration":
-                let dur = state.event.duration;
-                out = encodeHTML(`${dur.weeks}w${dur.days}d${dur.hours}h${dur.minutes}m${dur.seconds}s`);
-                break;
-              case "_event.start":
-                let start = state.event.startDate.toJSDate();
-                out = encodeHTML(start.toLocaleString("en-AU"));
-                break;
-              case "_event.end":
-                let end = state.event.endDate.toJSDate();
-                out = encodeHTML(end.toLocaleString("en-AU"));
-                break;
-              default: {
-                if (variables[varKey] != undefined) {
-                  out = encodeHTML(variables[varKey].toString())
-                }
-                else {
-                  out = "" as HTMLEncodedString;
-                }
-                break;
-              }
+            case "_event.duration": {
+              const dur = state.event.duration;
+              variableValue = `${dur.weeks}w${dur.days}d${dur.hours}h${dur.minutes}m${dur.seconds}s`;
+              break;
             }
-            break;
-          }
-          // UNSAFE
-          case "<span>": {
-            const content: HTMLEncodedString = evalToken(state, token[1]);
-            const classList: HTMLEncodedString = encodeHTML(token[2] ?? "");
-            out = `<span class="${classList}">${content}</span>` as HTMLEncodedString;
-            break;
-          }
-          // UNSAFE
-          case "<strong>": {
-            const content: HTMLEncodedString = evalToken(state, token[1]);
-            out = `<strong>${content}</strong>` as HTMLEncodedString;
-            break;
-          }
-          // UNSAFE
-          case "<em>": {
-            const content: HTMLEncodedString = evalToken(state, token[1]);
-            out = `<em>${content}</em>` as HTMLEncodedString;
-            break;
-          }
-          // UNSAFE
-          case "<i>": {
-            const content: HTMLEncodedString = evalToken(state, token[1]);
-            out = `<i>${content}</i>`as HTMLEncodedString;
-            break;
-          }
-          // UNSAFE
-          case "<b>": {
-            const content: HTMLEncodedString = evalToken(state, token[1]);
-            out = `<b>${content}</b>` as HTMLEncodedString;
-            break;
-          }
-          // UNSAFE
-          case "<time>": {
-            const content: HTMLEncodedString = evalToken(state, token[1]);
-            out = `<time>${content}</time>` as HTMLEncodedString;
-            break;
-          }
-          // UNSAFE
-          case "<abbr>": {
-            const content: HTMLEncodedString = evalToken(state, token[1]);
-            out = `<time>${content}</time>` as HTMLEncodedString;
-            break;
-          }
-          default: {
-            out = encodeHTML("");
-            break;
+            case "_event.start": {
+              const date = state.event.startDate.toJSDate();
+              const year = date.getFullYear().toString();
+              const month = padStart(date.getMonth().toString(), 2, "0");
+              const day = padStart(date.getDate().toString(), 2, "0");
+              const hour = padStart(date.getHours().toString(), 2, "0");
+              const minute = padStart(date.getMinutes().toString(), 2, "0");
+              const second = padStart(date.getSeconds().toString(), 2, "0");
+              variableValue = `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+              break;
+            }
+            case "_event.end": {
+              const date = state.event.endDate.toJSDate();
+              const year = date.getFullYear().toString();
+              const month = padStart(date.getMonth().toString(), 2, "0");
+              const day = padStart(date.getDate().toString(), 2, "0");
+              const hour = padStart(date.getHours().toString(), 2, "0");
+              const minute = padStart(date.getMinutes().toString(), 2, "0");
+              const second = padStart(date.getSeconds().toString(), 2, "0");
+              variableValue = `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+              break;
+            }
+            default: {
+              variableValue = "";
+              break;
+            }
           }
         }
-      }
-  
-      // console.log(`Lexeme<${JSON.stringify(lexeme)}> => ${out}`);
-      return out;
-    }
+        return new Text(variableValue);
+      },
+      "<span>"(state, args): HTMLSpanElement {
+        const element: HTMLSpanElement = document.createElement("span");
+        element.append(args[0]);
+        return element;
+      },
+      "<strong>"(state, args): HTMLElement {
+        const element: HTMLElement = document.createElement("strong");
+        element.append(args[0]);
+        return element;
+      },
+      "<em>"(state, args): HTMLElement {
+        const element: HTMLElement = document.createElement("em");
+        element.append(args[0]);
+        return element;
+      },
+      "<time>"(state, args): HTMLTimeElement {
+        const element: HTMLTimeElement = document.createElement("time");
+        element.append(args[0]);
+        element.dateTime = args[0].textContent ?? "";
+        return element;
+      },
+      "<abbr>"(state, args): HTMLElement {
+        const element: HTMLElement = document.createElement("abbr");
+        element.append(args[0]);
+        return element;
+      },
+      "<b>"(state, args): HTMLElement {
+        const element: HTMLElement = document.createElement("b");
+        element.append(args[0]);
+        return element;
+      },
+      "<i>"(state, args): HTMLElement {
+        const element: HTMLElement = document.createElement("i");
+        element.append(args[0]);
+        return element;
+      },
+    });
   
     return {
       title, variables, replacers, shaders,
       buildArticle: (state: ArticleState) => {
-  
         const articleEle = document.createElement("article");
         for (const line of viewJson["article"]) {
-          const pEle = document.createElement("p");
-  
-          // console.log("LINE");
-          for (const phrase of line) {
-            // console.log("PHRASE");
-            pEle.insertAdjacentHTML("beforeend", evalToken(state, phrase));
-          }
-  
-          articleEle.append(pEle);
+          const paragraph = document.createElement("p");
+          paragraph.append(...viewsArrayScriptRuntime.execute(state, line));
+          articleEle.append(paragraph);
         }
         return articleEle;
       }
@@ -564,7 +357,6 @@ namespace TTV {
 }
 
 /* Main */
-
 
 window.addEventListener("DOMContentLoaded", () => {
 
@@ -644,4 +436,4 @@ window.addEventListener("error", errEv => {
   if (reloadConfirmed) {
     TTV.elements.ttvResetButton.click();
   }
-})
+});
