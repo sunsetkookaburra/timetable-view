@@ -23,7 +23,7 @@ function padStart(data: string, size: number, fill: string): string {
 function localDateStr(date: Date): string {
   return date.getFullYear().toString()
   + "-" + padStart((date.getMonth()+1).toString(), 2, '0')
-  + "-" + padStart(date.getDate().toString(), 2, '0') as any;
+  + "-" + padStart(date.getDate().toString(), 2, '0');
 }
 
 /** `0h:0m:0s` */

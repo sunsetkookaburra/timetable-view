@@ -285,24 +285,12 @@ namespace TTV {
             }
             case "_event.start": {
               const date = state.event.startDate.toJSDate();
-              const year = date.getFullYear().toString();
-              const month = padStart(date.getMonth().toString(), 2, "0");
-              const day = padStart(date.getDate().toString(), 2, "0");
-              const hour = padStart(date.getHours().toString(), 2, "0");
-              const minute = padStart(date.getMinutes().toString(), 2, "0");
-              const second = padStart(date.getSeconds().toString(), 2, "0");
-              variableValue = `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+              variableValue = `${localDateStr(date)} ${localTimeStr}`;
               break;
             }
             case "_event.end": {
               const date = state.event.endDate.toJSDate();
-              const year = date.getFullYear().toString();
-              const month = padStart(date.getMonth().toString(), 2, "0");
-              const day = padStart(date.getDate().toString(), 2, "0");
-              const hour = padStart(date.getHours().toString(), 2, "0");
-              const minute = padStart(date.getMinutes().toString(), 2, "0");
-              const second = padStart(date.getSeconds().toString(), 2, "0");
-              variableValue = `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+              variableValue = `${localDateStr(date)} ${localTimeStr}`;
               break;
             }
             default: {
