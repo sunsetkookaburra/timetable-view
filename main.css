@@ -42,7 +42,7 @@ form > p > label {
   text-align: left;
 }
 
-form > p > input {
+form > p > input , form > p > select {
   display: block;
   width: 100%;
   font-family: "Lexend";

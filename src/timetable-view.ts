@@ -63,7 +63,7 @@ namespace TTV {
     viewTitleHeading: HTMLHeadingElement,
     viewCssLink:      HTMLLinkElement,
     ttvResetButton:   HTMLButtonElement,
-    ttvViewInput:     HTMLInputElement,
+    ttvViewSelect:    HTMLSelectElement,
     ttvPrevButton:    HTMLButtonElement,
     ttvNextButton:    HTMLButtonElement,
     ttvEventsHeading: HTMLHeadingElement,
@@ -77,7 +77,7 @@ namespace TTV {
     TTV.elements.viewTitleHeading = document.getElementById("view-title")   as HTMLHeadingElement;
     TTV.elements.viewCssLink =      document.getElementById("view-css")     as HTMLLinkElement;
     TTV.elements.ttvResetButton =   document.getElementById("ttv-reset")    as HTMLButtonElement;
-    TTV.elements.ttvViewInput =     document.getElementById("ttv-view")     as HTMLInputElement;
+    TTV.elements.ttvViewSelect =     document.getElementById("ttv-view")    as HTMLSelectElement;
     TTV.elements.ttvPrevButton =    document.getElementById("ttv-prev")     as HTMLButtonElement;
     TTV.elements.ttvNextButton =    document.getElementById("ttv-next")     as HTMLButtonElement;
     TTV.elements.ttvEventsHeading = document.getElementById("ttv-events-heading") as HTMLHeadingElement;
@@ -165,8 +165,20 @@ namespace TTV {
         const endPos = event.endDate.toJSDate().valueOf();
         const duration = endPos - startPos;
         const nowPos = nowMs - startPos;
-        const evProgress = Math.min(Math.max(nowPos / duration, 0), 1);
+        const evPos = nowPos / duration;
+        const evProgress = Math.min(Math.max(evPos, 0), 1);
+
         evItem.style.setProperty("--event-progress", evProgress.toFixed(2));
+
+        evItem.style.setProperty("--event-past", (evPos >= 1) ? '1' : '0');
+        if (evPos >= 1) evItem.setAttribute("data-event-past", "");
+
+        evItem.style.setProperty("--event-now", (evPos >= 0 && evPos < 1) ? '1' : '0');
+        if (evPos >= 0 && evPos < 1) evItem.setAttribute("data-event-now", "");
+
+        evItem.style.setProperty("--event-future", (evPos < 0) ? '1' : '0');
+        if (evPos < 0) evItem.setAttribute("data-event-future", "");
+
         evItem.append(view.buildArticle({event}));
         TTV.elements.eventsOList.append(evItem);
       }
@@ -377,12 +389,12 @@ window.addEventListener("DOMContentLoaded", () => {
     if (
       TTV.elements.icalUrlInput.reportValidity()
       && TTV.elements.eventsDateInput.reportValidity()
-      && TTV.elements.ttvViewInput.reportValidity()
+      && TTV.elements.ttvViewSelect.reportValidity()
     ) {
       TTV.updateCalendarView({
         forDate: TTV.elements.eventsDateInput.valueAsDate!,
         icalHref: TTV.elements.icalUrlInput.value,
-        viewId: TTV.elements.ttvViewInput.value,
+        viewId: TTV.elements.ttvViewSelect.value,
         refresh,
       });
       return true;
@@ -425,7 +437,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
   if (icalHref != null && viewId != null) {
     TTV.elements.icalUrlInput.value = icalHref;
-    TTV.elements.ttvViewInput.value = viewId;
+    TTV.elements.ttvViewSelect.value = viewId;
     checkValidInputsAndUpdate();
   }
 
