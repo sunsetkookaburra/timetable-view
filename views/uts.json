@@ -20,10 +20,12 @@
       ["/^lec$/mi", "Lecture"],
       ["/^tut$/mi", "Tutorial"],
       ["/^cmp$/mi", "Computer Lab"],
-      ["/^wrk$/mi", "Workshop"]
+      ["/^wrk$/mi", "Workshop"],
+      ["/^sem$/mi", "Seminar"]
     ],
     "room": [
       ["/ONLINE\\d*/", "Online"],
+      ["/PRERECORDED.ACTIVITY\\d*/", "Pre-Recorded"],
       ["/^(?! *online)/i", "in "]
     ],
     "duration": [
