@@ -201,6 +201,10 @@ namespace TTV {
   
   }
 
+  // ideally should be two functions,
+  // one for building up the state,
+  // one for constructing a 'dynamic' EventView.
+  // Builds the state and provides a builder function for each event.
   function buildEventsView(viewJson: ViewJSON): EventsView {
 
     const title = viewJson["title"] || "Timetable View";
@@ -234,6 +238,10 @@ namespace TTV {
     // const shaderCache = new Map<string, RegExpMatchArray[]>();
 
     const viewsArrayScriptRuntime = new ViewScript.Runtime<ArticleState>({
+      // a shader is a transform on a string, that when applied
+      // bundles it up into an array of matches (for use with /.../g)
+      // which each are of the format [wholeMatch: string, ...groups: string[]]
+      // so ["shader", ...content..., "abc", 0, 1] gets "abc" shader's 0th match and 1st capturing group
       "shader"(state, args): Text {
         const inputText = args[0].textContent ?? "";
         const shaderKey = args[1].textContent ?? "";
@@ -249,6 +257,8 @@ namespace TTV {
         }
         return element;
       },
+      // ["replace", ...content..., "abc"] replaces the content by applying the
+      // array of rules [regex, replaceStr] in order (1st to last)
       "replace"(state, args): Text {
         const originalText = args[0].textContent ?? "";
         const replacerKey = args[1].textContent ?? "";
@@ -262,6 +272,7 @@ namespace TTV {
         }
         return element;
       },
+      // can currently only access variables, maybe implement postfix operators??
       "var"(state, args): Text {
         const varKey = args[0].textContent ?? "";
         let variableValue: string;
@@ -301,6 +312,8 @@ namespace TTV {
         }
         return new Text(variableValue);
       },
+      // all these functions put the content as the content of the respective element
+      // (in future add ability for id and class)
       "<span>"(state, args): HTMLSpanElement {
         const element: HTMLSpanElement = document.createElement("span");
         element.append(args[0]);
@@ -342,15 +355,22 @@ namespace TTV {
     return {
       title, variables, replacers, shaders,
       buildArticle: (state: ArticleState) => {
+        // <article> means that it can be removed from the document and make sense
+        // it will become a child of `#events > li`
         const articleEle = document.createElement("article");
+        // each member in ["article"] constitutes a whole ViewScript program
+        // whose output becomes the content of each <p> in the <article>
         for (const line of viewJson["article"]) {
           const paragraph = document.createElement("p");
           paragraph.append(...viewsArrayScriptRuntime.execute(state, line));
+          // find all URLs and replace them with hyperlinks
+          findAndHref(paragraph);
+          // the the line to the <article>
           articleEle.append(paragraph);
         }
         return articleEle;
       }
-    }
+    } as EventsView;
   
   }
 

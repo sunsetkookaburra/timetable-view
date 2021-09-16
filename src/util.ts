@@ -87,3 +87,31 @@ function createRegExpReplacer(replacerRules: [RegExp, string][]): RegExpReplacer
   return fn;
 
 }
+
+function findAndHref(root: Node) {
+  // recurse children
+  // do not follow down <a>
+  // replace text node with before + <a> + after
+  for (const node of root.childNodes) {
+    if (node.nodeName == "#text") {
+      const re = /https?:\/\/[^ ]+/;
+      const text = node.textContent ?? "";
+      const match = re.exec(text);
+      if (match != null) {
+        const front = text.slice(0, match.index);
+        const back = text.slice(match.index + match[0].length);
+        const anchor = document.createElement("a");
+        const url = new URL(match[0]);
+        anchor.href = url.href;
+        anchor.textContent = url.hostname;
+        node.parentNode?.insertBefore(document.createTextNode(front), node);
+        node.parentNode?.insertBefore(anchor, node);
+        node.parentNode?.insertBefore(document.createTextNode(back), node);
+        node.remove();
+      }
+    }
+    else if (node.nodeName != "A") {
+      findAndHref(node);
+    }
+  }
+}
