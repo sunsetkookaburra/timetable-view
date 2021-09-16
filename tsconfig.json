@@ -10,7 +10,7 @@
     "sourceMap": true,
     "removeComments": false,
     "module": "None",
-    "outFile": "./lib/timetable-view.bundle.js",
+    "outFile": "./lib/timetable-view.min.js",
     "noFallthroughCasesInSwitch": true
   },
   "files": [
