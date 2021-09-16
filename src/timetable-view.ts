@@ -296,12 +296,12 @@ namespace TTV {
             }
             case "_event.start": {
               const date = state.event.startDate.toJSDate();
-              variableValue = `${localDateStr(date)} ${localTimeStr}`;
+              variableValue = `${localDateStr(date)} ${localTimeStr(date)}`;
               break;
             }
             case "_event.end": {
               const date = state.event.endDate.toJSDate();
-              variableValue = `${localDateStr(date)} ${localTimeStr}`;
+              variableValue = `${localDateStr(date)} ${localTimeStr(date)}`;
               break;
             }
             default: {
