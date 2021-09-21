@@ -74,7 +74,7 @@ namespace ArrayScript {
         value = this.foundation(chunk);
         ok = true;
       }
-      console.log(value);
+      // console.log(value);
       return { ok, value };
     }
 

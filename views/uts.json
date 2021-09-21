@@ -9,8 +9,7 @@
   "replacers": {
     "abbr": [
       ["/\\bIntroduction\\b/", "Int."],
-      ["/\\bMathematical\\b/", "Math."],
-      ["/\\bDatabase\\b/", "DB"]
+      ["/\\bMathematical\\b/", "Math."]
     ],
     "ordinal_letter": [
       ["/1/", "A"],
