@@ -17,7 +17,7 @@
     "./src/ical.d.ts",
     "./src/util.ts",
     "./src/namespaced-storage.ts",
-    "./src/viewscript.ts",
+    "./src/arrayscript.ts",
     "./src/timetable-view.ts",
   ],
 }

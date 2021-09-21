@@ -14,7 +14,7 @@ interface ViewJSON {
   variables: Record<string, string>;
   replacers: Record<string, [RegexLiteralString, RegexReplaceString][]>;
   shaders: Record<string, RegexLiteralString>;
-  article: ViewScript.SourceCodeProgram[];
+  article: ArrayScript.SourceCodeProgram[];
 }
 
 interface ArticleState {
@@ -237,120 +237,96 @@ namespace TTV {
     // not really necessary at this level, remove for now
     // const shaderCache = new Map<string, RegExpMatchArray[]>();
 
-    const viewsArrayScriptRuntime = new ViewScript.Runtime<ArticleState>({
-      // a shader is a transform on a string, that when applied
-      // bundles it up into an array of matches (for use with /.../g)
-      // which each are of the format [wholeMatch: string, ...groups: string[]]
-      // so ["shader", ...content..., "abc", 0, 1] gets "abc" shader's 0th match and 1st capturing group
-      "shader"(state, args): Text {
-        const inputText = args[0].textContent ?? "";
-        const shaderKey = args[1].textContent ?? "";
-        const matchNum = parseInt(args[2].textContent ?? "") || 0;
-        const groupNum = parseInt(args[3].textContent ?? "") || 0;
-        let element: Text;
-        if (shaderKey in shaders) {
-          const shaderResult = shaders[shaderKey](inputText);
-          element = new Text(shaderResult[matchNum][groupNum]);
-        }
-        else {
-          element = new Text();
-        }
-        return element;
-      },
-      // ["replace", ...content..., "abc"] replaces the content by applying the
-      // array of rules [regex, replaceStr] in order (1st to last)
-      "replace"(state, args): Text {
-        const originalText = args[0].textContent ?? "";
-        const replacerKey = args[1].textContent ?? "";
-        let element: Text;
-        if (replacerKey in replacers) {
-          const replacerResult = replacers[replacerKey](originalText);
-          element = new Text(replacerResult);
-        }
-        else {
-          element = new Text();
-        }
-        return element;
-      },
-      // can currently only access variables, maybe implement postfix operators??
-      "var"(state, args): Text {
-        const varKey = args[0].textContent ?? "";
-        let variableValue: string;
-        if (varKey in variables) {
-          variableValue = variables[varKey];
-        }
-        else {
-          switch (varKey) {
-            case "_event.description": {
-              variableValue = state.event.description;
-              break;
-            }
-            case "_event.location": {
-              variableValue = state.event.location
-              break;
-            }
-            case "_event.duration": {
-              const dur = state.event.duration;
-              variableValue = `${dur.weeks}w${dur.days}d${dur.hours}h${dur.minutes}m${dur.seconds}s`;
-              break;
-            }
-            case "_event.start": {
-              const date = state.event.startDate.toJSDate();
-              variableValue = `${localDateStr(date)} ${localTimeStr(date)}`;
-              break;
-            }
-            case "_event.end": {
-              const date = state.event.endDate.toJSDate();
-              variableValue = `${localDateStr(date)} ${localTimeStr(date)}`;
-              break;
-            }
-            default: {
-              variableValue = "";
-              break;
-            }
+    const viewsRT = new ArrayScript.Runtime<ArticleState, (Element | Text)>(
+      primitive => document.createTextNode(primitive?.toString() ?? "null")
+    );
+
+    // a shader is a transform on a string, that when applied
+    // bundles it up into an array of matches (for use with /.../g)
+    // which each are of the format [wholeMatch: string, ...groups: string[]]
+    // so ["shader", ...content..., "abc", 0, 1] gets "abc" shader's 0th match and 1st capturing group
+    viewsRT.register("shader", (state, args) => {
+      const inputText = args[0].textContent ?? "";
+      const shaderKey = args[1].textContent ?? "";
+      const matchNum = parseInt(args[2].textContent ?? "") || 0;
+      const groupNum = parseInt(args[3].textContent ?? "") || 0;
+      let element: Text;
+      if (shaderKey in shaders) {
+        const shaderResult = shaders[shaderKey](inputText);
+        element = new Text(shaderResult[matchNum][groupNum]);
+      }
+      else {
+        element = new Text();
+      }
+      return element;
+    });
+
+    // ["replace", ...content..., "abc"] replaces the content by applying the
+    // array of rules [regex, replaceStr] in order (1st to last)
+    viewsRT.register("replace", (state, args) => {
+      const originalText = args[0].textContent ?? "";
+      const replacerKey = args[1].textContent ?? "";
+      let element: Text;
+      if (replacerKey in replacers) {
+        const replacerResult = replacers[replacerKey](originalText);
+        element = new Text(replacerResult);
+      }
+      else {
+        element = new Text();
+      }
+      return element;
+    });
+
+    // can currently only access variables, maybe implement postfix operators??
+    viewsRT.register("var", (state, args) => {
+      const varKey = args[0].textContent ?? "";
+      let variableValue: string;
+      if (varKey in variables) {
+        variableValue = variables[varKey];
+      }
+      else {
+        switch (varKey) {
+          case "_event.description": {
+            variableValue = state.event.description;
+            break;
+          }
+          case "_event.location": {
+            variableValue = state.event.location
+            break;
+          }
+          case "_event.duration": {
+            const dur = state.event.duration;
+            variableValue = `${dur.weeks}w${dur.days}d${dur.hours}h${dur.minutes}m${dur.seconds}s`;
+            break;
+          }
+          case "_event.start": {
+            const date = state.event.startDate.toJSDate();
+            variableValue = `${localDateStr(date)} ${localTimeStr(date)}`;
+            break;
+          }
+          case "_event.end": {
+            const date = state.event.endDate.toJSDate();
+            variableValue = `${localDateStr(date)} ${localTimeStr(date)}`;
+            break;
+          }
+          default: {
+            variableValue = "";
+            break;
           }
         }
-        return new Text(variableValue);
-      },
-      // all these functions put the content as the content of the respective element
-      // (in future add ability for id and class)
-      "<span>"(state, args): HTMLSpanElement {
-        const element: HTMLSpanElement = document.createElement("span");
-        element.append(args[0]);
-        return element;
-      },
-      "<strong>"(state, args): HTMLElement {
-        const element: HTMLElement = document.createElement("strong");
-        element.append(args[0]);
-        return element;
-      },
-      "<em>"(state, args): HTMLElement {
-        const element: HTMLElement = document.createElement("em");
-        element.append(args[0]);
-        return element;
-      },
-      "<time>"(state, args): HTMLTimeElement {
-        const element: HTMLTimeElement = document.createElement("time");
-        element.append(args[0]);
-        element.dateTime = args[0].textContent ?? "";
-        return element;
-      },
-      "<abbr>"(state, args): HTMLElement {
-        const element: HTMLElement = document.createElement("abbr");
-        element.append(args[0]);
-        return element;
-      },
-      "<b>"(state, args): HTMLElement {
-        const element: HTMLElement = document.createElement("b");
-        element.append(args[0]);
-        return element;
-      },
-      "<i>"(state, args): HTMLElement {
-        const element: HTMLElement = document.createElement("i");
-        element.append(args[0]);
-        return element;
-      },
+      }
+      return new Text(variableValue);
     });
+
+    // all these functions below put the content as the content of the respective element
+    // (in future add ability for id and class)
+    viewsRT.register("<span>", (state, args) => createHTMLElement("span", [args[0]]));
+    viewsRT.register("<strong>", (state, args) => createHTMLElement("strong", [args[0]]));
+    viewsRT.register("<em>", (state, args) => createHTMLElement("em", [args[0]]));
+    viewsRT.register("<time>", (state, args) => createHTMLElement(`time[datetime=${args[0].textContent}]`, [args[0]]));
+    viewsRT.register("<abbr>", (state, args) => createHTMLElement("abbr", [args[0]]));
+    viewsRT.register("<b>", (state, args) => createHTMLElement("b", [args[0]]));
+    viewsRT.register("<i>", (state, args) => createHTMLElement("i", [args[0]]));
   
     return {
       title, variables, replacers, shaders,
@@ -362,7 +338,7 @@ namespace TTV {
         // whose output becomes the content of each <p> in the <article>
         for (const line of viewJson["article"]) {
           const paragraph = document.createElement("p");
-          paragraph.append(...viewsArrayScriptRuntime.execute(state, line));
+          paragraph.append(...viewsRT.execute(state, line));
           // find all URLs and replace them with hyperlinks
           findAndHref(paragraph);
           // the the line to the <article>

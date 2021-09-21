@@ -115,3 +115,36 @@ function findAndHref(root: Node) {
     }
   }
 }
+
+function createHTMLElement(selector: string, children: Node[] = []): HTMLElement {
+  const re = /\[([A-Za-z0-9-]+)(?:=(.*?))?]|(?:#|.|^)([A-Za-z0-9-]+)/gm;
+  let match: RegExpMatchArray | null;
+  let tag: string = "div";
+  let id: string = "";
+  let classes: string[] = [];
+  let attrs: [string, string][] = [];
+  while ((match = re.exec(selector)) != null) {
+    switch (match[0][0]) {
+      case "#":
+        id = match[3];
+        break;
+      case ".":
+        classes.push(match[3]);
+        break;
+      case "[":
+        attrs.push([match[1], match[2] ?? ""]);
+        break;
+      default:
+        tag = match[0];
+        break;
+    }
+  }
+  const ele = document.createElement(tag);
+  if (id) ele.id = id;
+  ele.classList.add(...classes);
+  for (const [k,v] of attrs) {
+    ele.setAttribute(k, v);
+  }
+  ele.append(...children);
+  return ele;
+}
